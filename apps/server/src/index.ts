@@ -1,15 +1,24 @@
 import { Elysia } from "elysia";
+import { onSimulationEvent } from "./events/emitter";
+import {
+  isPhaseOneHarnessRunning,
+  startPhaseOneHarness,
+  stopPhaseOneHarness,
+} from "./scenarios/phase1-harness";
 import {
   checkBullMqConnection,
   closeBullMqConnection,
 } from "./services/bullmq";
 import { env } from "./services/env";
-import { checkKafkaConnection } from "./services/kafka";
+import { checkKafkaConnection, closeKafkaConnection } from "./services/kafka";
 import {
   checkPostgresConnection,
   closePostgresConnection,
 } from "./services/postgres";
-import { checkRabbitMqConnection } from "./services/rabbitmq";
+import {
+  checkRabbitMqConnection,
+  closeRabbitMqConnection,
+} from "./services/rabbitmq";
 import { checkRedisConnection, closeRedisConnection } from "./services/redis";
 import { log } from "./utils/logger";
 
@@ -68,20 +77,55 @@ async function getServiceHealth(): Promise<HealthResponse> {
   };
 }
 
+let simulationClientCount = 0;
+
 const app = new Elysia()
   .get("/health", async () => {
     const result = await getServiceHealth();
     return result;
   })
+  .get("/simulation/harness", () => {
+    return {
+      running: isPhaseOneHarnessRunning(),
+      connectedClients: simulationClientCount,
+    };
+  })
+  .ws("/ws/simulation", {
+    open(ws) {
+      ws.subscribe("simulation");
+      simulationClientCount += 1;
+
+      if (!isPhaseOneHarnessRunning()) {
+        void startPhaseOneHarness();
+      }
+    },
+    close(ws) {
+      ws.unsubscribe("simulation");
+      simulationClientCount = Math.max(0, simulationClientCount - 1);
+
+      if (simulationClientCount === 0) {
+        void stopPhaseOneHarness();
+      }
+    },
+  })
   .listen(env.serverPort);
+
+const unsubscribeFromSimulationBus = onSimulationEvent((event) => {
+  app.server?.publish("simulation", JSON.stringify(event));
+});
 
 log("info", "Elysia server started", {
   port: env.serverPort,
 });
 
 const shutdown = async (): Promise<void> => {
+  unsubscribeFromSimulationBus();
+  await stopPhaseOneHarness();
+
   await Promise.allSettled([
     closeBullMqConnection(),
+    closeRabbitMqConnection(),
+    closeKafkaConnection(),
     closeRedisConnection(),
     closePostgresConnection(),
   ]);

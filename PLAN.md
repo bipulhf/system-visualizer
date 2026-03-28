@@ -381,12 +381,14 @@ interface SimulationEvent {
 
 **Goal:** Animated architecture diagram that responds to real-time events.
 
+**Status:** Completed
+
 #### Backend
 
-- [ ] Implement WebSocket endpoint in Elysia.js (`/ws/simulation`)
-- [ ] Create central `EventEmitter` that all service wrappers emit through
-- [ ] Wire EventEmitter → WebSocket broadcast
-- [ ] Create service wrapper modules:
+- [x] Implement WebSocket endpoint in Elysia.js (`/ws/simulation`)
+- [x] Create central `EventEmitter` that all service wrappers emit through
+- [x] Wire EventEmitter → WebSocket broadcast
+- [x] Create service wrapper modules:
   - `redis.ts` — wraps ioredis, emits events on every operation
   - `bullmq.ts` — wraps queue/worker creation, emits on job lifecycle
   - `rabbitmq.ts` — wraps channel ops, emits on publish/consume/ack
@@ -395,18 +397,18 @@ interface SimulationEvent {
 
 #### Frontend
 
-- [ ] Build `use-simulation` hook (WebSocket connect, reconnect, message parsing)
-- [ ] Build `flow-canvas.tsx` with @xyflow/react
-- [ ] Create custom `service-node.tsx` — neobrutalism styled node per service with:
+- [x] Build `use-simulation` hook (WebSocket connect, reconnect, message parsing)
+- [x] Build `flow-canvas.tsx` with @xyflow/react
+- [x] Create custom `service-node.tsx` — neobrutalism styled node per service with:
   - Service icon + name
   - Status indicator (idle/active/error) with color pulse
   - Mini stats (ops/sec, queue depth)
-- [ ] Create `animated-edge.tsx` — edges with:
+- [x] Create `animated-edge.tsx` — edges with:
   - Particle dots flowing along the path when data moves
   - Message count badge
   - Color matches source service
-- [ ] Build `use-flow-state` hook — maps incoming WebSocket events to @xyflow node/edge state updates
-- [ ] Implement edge animation using motion library (particles along SVG path)
+- [x] Build `use-flow-state` hook — maps incoming WebSocket events to @xyflow node/edge state updates
+- [x] Implement edge animation using motion library (particles along SVG path)
 
 **Deliverable:** Connect to backend via WS, see service nodes light up and edges animate when events flow. No scenario logic yet — just a test harness that pushes sample events.
 
