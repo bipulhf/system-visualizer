@@ -124,6 +124,20 @@
   }
 }
 
+@keyframes guide-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 color-mix(in oklch, var(--main) 44%, transparent),
+      var(--shadow);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px color-mix(in oklch, var(--main) 15%, transparent),
+      var(--shadow);
+  }
+}
+
 @utility what-if-failure {
   border-color: oklch(60% 0.25 25);
   animation: phase2-shake 0.42s ease-in-out infinite;
@@ -144,6 +158,29 @@
   animation: skeleton-sheen 1.35s linear infinite;
 }
 
+@layer components {
+  .guide-highlight {
+    border-color: color-mix(in oklch, var(--main) 75%, black 25%);
+    animation: guide-pulse 1.15s ease-in-out infinite;
+  }
+
+  .guide-badge {
+    position: absolute;
+    top: -13px;
+    left: 10px;
+    display: inline-flex;
+    border: 2px solid var(--border);
+    background: var(--bullmq);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: var(--shadow);
+    z-index: 30;
+  }
+}
+
 @layer base {
   :focus-visible {
     outline: 3px solid color-mix(in oklch, var(--main) 78%, black 22%);
@@ -162,6 +199,10 @@
   }
 
   .what-if-failure {
+    animation: none !important;
+  }
+
+  .guide-highlight {
     animation: none !important;
   }
 }

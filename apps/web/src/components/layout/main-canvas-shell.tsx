@@ -75,6 +75,71 @@ type BankingOverlaySnapshot = {
   auditReads: number;
 };
 
+type FocusPanel = "flow" | "metrics" | "events";
+type ScenarioPhase = ReturnType<
+  typeof getScenarioLearningContent
+>["phases"][number];
+type GuideTarget = "tracker" | "flow" | "focus" | "metrics" | "events";
+
+type GuideStep = {
+  id: string;
+  target: GuideTarget;
+  title: string;
+  description: string;
+  focusPanel?: FocusPanel;
+};
+
+const onboardingStorageKey = "sv-onboarding-guide-v1";
+
+const guideSteps: readonly GuideStep[] = [
+  {
+    id: "tracker",
+    target: "tracker",
+    title: "Mission 1: Track Scenario Progress",
+    description:
+      "Start here every time. This panel tells you your current phase, next phase, and progress.",
+  },
+  {
+    id: "flow",
+    target: "flow",
+    title: "Mission 2: Watch Live Data Movement",
+    description:
+      "The flow canvas shows where requests and messages are traveling between services.",
+  },
+  {
+    id: "focus",
+    target: "focus",
+    title: "Mission 3: Choose One Learning Mode",
+    description:
+      "Use Focus Steps to avoid overload. Learn in this order: Flow, Metrics, then Events.",
+    focusPanel: "flow",
+  },
+  {
+    id: "metrics",
+    target: "metrics",
+    title: "Mission 4: Check Service Health",
+    description:
+      "Metrics tells you which service is under load and how throughput changes over time.",
+    focusPanel: "metrics",
+  },
+  {
+    id: "events",
+    target: "events",
+    title: "Mission 5: Read the Story in Events",
+    description:
+      "Use the event feed to see what happened, why it happened, and where latency came from.",
+    focusPanel: "events",
+  },
+];
+
+const sectionIdByTarget: Record<GuideTarget, string> = {
+  tracker: "guide-target-tracker",
+  flow: "guide-target-flow",
+  focus: "guide-target-focus",
+  metrics: "guide-target-metrics",
+  events: "guide-target-events",
+};
+
 function isVideoRendition(value: string): value is VideoRendition {
   return videoRenditions.includes(value as VideoRendition);
 }
@@ -649,10 +714,12 @@ export function MainCanvasShell({
   scenarioId: SupportedScenarioId;
 }) {
   const {
+    currentPhase,
     playbackRate,
     paused,
     stepCounter,
     setCurrentPhase,
+    requestPhaseJump,
     phaseJumpRequest,
     clearPhaseJumpRequest,
     whatIfEnabled,
@@ -679,6 +746,11 @@ export function MainCanvasShell({
     null,
   );
   const [shownConceptIds, setShownConceptIds] = useState<string[]>([]);
+  const [showAdvancedOverlay, setShowAdvancedOverlay] =
+    useState<boolean>(false);
+  const [focusPanel, setFocusPanel] = useState<FocusPanel>("flow");
+  const [guideVisible, setGuideVisible] = useState<boolean>(false);
+  const [guideIndex, setGuideIndex] = useState<number>(0);
 
   const showLoadingState =
     connectionState === "connecting" && events.length === 0;
@@ -687,12 +759,54 @@ export function MainCanvasShell({
   const scenarioCompleted = events.some(
     (event) => event.kind === "scenario.complete",
   );
+  const totalPhases = scenarioContent.phases.length;
+  const safeCurrentPhase = Math.min(totalPhases, Math.max(1, currentPhase));
+  const activePhase =
+    scenarioContent.phases[safeCurrentPhase - 1] ?? scenarioContent.phases[0];
+  const nextPhase =
+    safeCurrentPhase < totalPhases
+      ? scenarioContent.phases[safeCurrentPhase]
+      : null;
+  const progressPercent = Math.round(
+    (safeCurrentPhase / Math.max(1, totalPhases)) * 100,
+  );
+  const currentGuideStep = guideVisible
+    ? (guideSteps[guideIndex] ?? null)
+    : null;
+  const isGuideTarget = (target: GuideTarget): boolean => {
+    return currentGuideStep?.target === target;
+  };
+  const guidanceMessage = showConnectionError
+    ? "Connection lost. Restart backend services, then continue from the same phase."
+    : showLoadingState
+      ? "Connecting and preparing the first live events."
+      : scenarioCompleted
+        ? "Scenario complete. Review summary and compare how each technology helped."
+        : paused
+          ? "Playback is paused. Use Step to inspect one event at a time."
+          : `Live now: ${activePhase?.title ?? "Phase"}. Watch the highlighted data path.`;
 
   useEffect(() => {
     setCurrentPhase(1);
     setShownConceptIds([]);
     setActiveConcept(null);
+    setShowAdvancedOverlay(false);
+    setFocusPanel("flow");
   }, [scenarioId, setCurrentPhase]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const hasCompletedGuide =
+      window.localStorage.getItem(onboardingStorageKey) === "done";
+
+    if (!hasCompletedGuide) {
+      setGuideVisible(true);
+      setGuideIndex(0);
+    }
+  }, []);
 
   useEffect(() => {
     if (phaseJumpRequest === null) {
@@ -765,13 +879,15 @@ export function MainCanvasShell({
       return;
     }
 
-    const concept = scenarioContent.conceptDefinitions.find((entry) => {
-      if (!entry.triggerKinds.includes(latestEvent.kind)) {
-        return false;
-      }
+    const concept = scenarioContent.conceptDefinitions.find(
+      (entry: ConceptDefinition) => {
+        if (!entry.triggerKinds.includes(latestEvent.kind)) {
+          return false;
+        }
 
-      return !shownConceptIds.includes(entry.id);
-    });
+        return !shownConceptIds.includes(entry.id);
+      },
+    );
 
     if (!concept) {
       return;
@@ -781,9 +897,148 @@ export function MainCanvasShell({
     setActiveConcept(concept);
   }, [events, scenarioContent.conceptDefinitions, shownConceptIds]);
 
+  useEffect(() => {
+    if (!currentGuideStep) {
+      return;
+    }
+
+    if (currentGuideStep.focusPanel) {
+      setFocusPanel(currentGuideStep.focusPanel);
+    }
+
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const sectionId = sectionIdByTarget[currentGuideStep.target];
+    const targetElement = document.getElementById(sectionId);
+    if (!targetElement) {
+      return;
+    }
+
+    targetElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [currentGuideStep]);
+
+  const jumpToAdjacentPhase = (direction: -1 | 1): void => {
+    const targetPhase = Math.max(
+      1,
+      Math.min(totalPhases, safeCurrentPhase + direction),
+    );
+
+    if (targetPhase === safeCurrentPhase) {
+      return;
+    }
+
+    setCurrentPhase(targetPhase);
+    requestPhaseJump(targetPhase);
+  };
+
+  const finishGuide = (): void => {
+    setGuideVisible(false);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(onboardingStorageKey, "done");
+    }
+  };
+
+  const openGuide = (): void => {
+    setGuideVisible(true);
+    setGuideIndex(0);
+  };
+
+  const moveGuide = (direction: -1 | 1): void => {
+    if (direction < 0) {
+      setGuideIndex((previous) => Math.max(0, previous - 1));
+      return;
+    }
+
+    if (guideIndex >= guideSteps.length - 1) {
+      finishGuide();
+      return;
+    }
+
+    setGuideIndex((previous) => Math.min(guideSteps.length - 1, previous + 1));
+  };
+
   return (
-    <section className="neo-panel scenario-shell-enter grid min-h-[60dvh] grid-rows-[1fr,auto,auto,auto] gap-3 bg-[var(--background)] p-3">
-      <div className="neo-panel relative overflow-hidden bg-[var(--surface)] p-4">
+    <section className="neo-panel scenario-shell-enter grid min-h-[60dvh] grid-rows-[auto,1fr,auto,auto] gap-3 bg-[var(--background)] p-3">
+      <section
+        id={sectionIdByTarget.tracker}
+        className={`neo-panel relative bg-[var(--surface)] p-3 ${isGuideTarget("tracker") ? "guide-highlight" : ""}`}
+      >
+        {isGuideTarget("tracker") ? (
+          <span className="guide-badge">LOOK HERE</span>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-wide">
+              Beginner Tracker
+            </p>
+            <p className="text-sm font-bold">
+              Phase {safeCurrentPhase} of {totalPhases}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={safeCurrentPhase <= 1}
+              onClick={() => {
+                jumpToAdjacentPhase(-1);
+              }}
+            >
+              Previous Phase
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={safeCurrentPhase >= totalPhases}
+              onClick={() => {
+                jumpToAdjacentPhase(1);
+              }}
+            >
+              Next Phase
+            </Button>
+            <Button size="sm" variant="ghost" onClick={openGuide}>
+              Guide
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-2 h-3 overflow-hidden border-2 border-[var(--border)] bg-[var(--background)]">
+          <div
+            className="h-full bg-[var(--main)] transition-[width] duration-200"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
+          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+            Now: {activePhase?.title ?? "-"}
+          </p>
+          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+            Next: {nextPhase?.title ?? "Final step reached"}
+          </p>
+          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+            Events processed: {events.length}
+          </p>
+          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+            Status: {guidanceMessage}
+          </p>
+        </div>
+      </section>
+
+      <div
+        id={sectionIdByTarget.flow}
+        className={`neo-panel relative overflow-hidden bg-[var(--surface)] p-4 ${isGuideTarget("flow") ? "guide-highlight" : ""}`}
+      >
+        {isGuideTarget("flow") ? (
+          <span className="guide-badge">LOOK HERE</span>
+        ) : null}
         <div className="absolute -top-16 right-8 h-40 w-40 rounded-full bg-[var(--main)]/25 blur-2xl" />
         <div className="absolute -bottom-14 left-8 h-32 w-32 rounded-full bg-[var(--rabbitmq)]/35 blur-2xl" />
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
@@ -800,6 +1055,15 @@ export function MainCanvasShell({
             <span className="neo-panel bg-[var(--background)] px-2 py-1 text-[11px] font-black uppercase">
               buffered {bufferedCount}
             </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setShowAdvancedOverlay((previous) => !previous);
+              }}
+            >
+              {showAdvancedOverlay ? "Hide Advanced" : "Show Advanced"}
+            </Button>
             <Button size="sm" variant="ghost" onClick={clearEvents}>
               Clear Log
             </Button>
@@ -816,15 +1080,17 @@ export function MainCanvasShell({
           </div>
         ) : null}
 
-        {scenarioId === "ride-sharing" ? (
+        {showAdvancedOverlay && scenarioId === "ride-sharing" ? (
           <RideSharingOverlay events={events} />
         ) : null}
 
-        {scenarioId === "video-pipeline" ? (
+        {showAdvancedOverlay && scenarioId === "video-pipeline" ? (
           <VideoPipelineOverlay events={events} />
         ) : null}
 
-        {scenarioId === "banking" ? <BankingOverlay events={events} /> : null}
+        {showAdvancedOverlay && scenarioId === "banking" ? (
+          <BankingOverlay events={events} />
+        ) : null}
 
         {showLoadingState ? (
           <div className="neo-panel skeleton-wave relative z-10 mt-4 h-[460px] bg-[var(--background)]" />
@@ -852,13 +1118,153 @@ export function MainCanvasShell({
         isVisible={scenarioCompleted}
       />
 
-      {showLoadingState ? (
-        <section className="neo-panel skeleton-wave h-28 bg-[var(--surface)]" />
-      ) : (
-        <ActivityBar metrics={metrics} events={throttledFlowEvents} />
-      )}
+      <section
+        id={sectionIdByTarget.focus}
+        className={`neo-panel relative bg-[var(--surface)] p-3 ${isGuideTarget("focus") ? "guide-highlight" : ""}`}
+      >
+        {isGuideTarget("focus") ? (
+          <span className="guide-badge">LOOK HERE</span>
+        ) : null}
+        <h3 className="text-xs font-black uppercase tracking-wide">
+          Focus Steps
+        </h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={focusPanel === "flow" ? "default" : "ghost"}
+            onClick={() => {
+              setFocusPanel("flow");
+            }}
+          >
+            1. Follow Flow
+          </Button>
+          <Button
+            size="sm"
+            variant={focusPanel === "metrics" ? "default" : "ghost"}
+            onClick={() => {
+              setFocusPanel("metrics");
+            }}
+          >
+            2. Check Metrics
+          </Button>
+          <Button
+            size="sm"
+            variant={focusPanel === "events" ? "default" : "ghost"}
+            onClick={() => {
+              setFocusPanel("events");
+            }}
+          >
+            3. Read Events
+          </Button>
+        </div>
+      </section>
 
-      <EventFeed events={events} />
+      {focusPanel === "flow" ? (
+        <section className="neo-panel bg-[var(--surface)] p-3">
+          <h3 className="text-xs font-black uppercase tracking-wide">
+            Tracking Checklist
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {scenarioContent.phases.map((phase: ScenarioPhase) => {
+              const status =
+                phase.id < safeCurrentPhase
+                  ? "Completed"
+                  : phase.id === safeCurrentPhase
+                    ? "In progress"
+                    : "Upcoming";
+
+              return (
+                <li
+                  key={phase.id}
+                  className="neo-panel flex items-start justify-between gap-2 bg-[var(--background)] px-3 py-2"
+                >
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide">
+                      Phase {phase.id}: {phase.title}
+                    </p>
+                    <p className="mt-1 text-xs">{phase.description}</p>
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wide">
+                    {status}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {focusPanel === "metrics" ? (
+        <section
+          id={sectionIdByTarget.metrics}
+          className={`relative ${isGuideTarget("metrics") ? "guide-highlight" : ""}`}
+        >
+          {isGuideTarget("metrics") ? (
+            <span className="guide-badge">LOOK HERE</span>
+          ) : null}
+          {showLoadingState ? (
+            <section className="neo-panel skeleton-wave h-28 bg-[var(--surface)]" />
+          ) : (
+            <ActivityBar metrics={metrics} events={throttledFlowEvents} />
+          )}
+        </section>
+      ) : null}
+
+      {focusPanel === "events" ? (
+        <section
+          id={sectionIdByTarget.events}
+          className={`relative ${isGuideTarget("events") ? "guide-highlight" : ""}`}
+        >
+          {isGuideTarget("events") ? (
+            <span className="guide-badge">LOOK HERE</span>
+          ) : null}
+          <EventFeed events={events} />
+        </section>
+      ) : null}
+
+      {currentGuideStep ? (
+        <div className="pointer-events-none fixed inset-0 z-50 bg-black/20">
+          <aside className="neo-panel pointer-events-auto absolute bottom-4 right-4 z-50 w-[min(92vw,26rem)] bg-[var(--surface)] p-4">
+            <p className="text-[11px] font-black uppercase tracking-wide">
+              Tutorial Quest {guideIndex + 1}/{guideSteps.length}
+            </p>
+            <h3 className="mt-1 text-base font-black tracking-tight">
+              {currentGuideStep.title}
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed">
+              {currentGuideStep.description}
+            </p>
+            <p className="mt-2 text-xs font-semibold">
+              Follow the pulsing LOOK HERE tag, then continue to the next
+              mission.
+            </p>
+
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={guideIndex === 0}
+                onClick={() => {
+                  moveGuide(-1);
+                }}
+              >
+                Back
+              </Button>
+              <Button size="sm" variant="ghost" onClick={finishGuide}>
+                Skip
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  moveGuide(1);
+                }}
+              >
+                {guideIndex >= guideSteps.length - 1 ? "Finish" : "Next"}
+              </Button>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }
