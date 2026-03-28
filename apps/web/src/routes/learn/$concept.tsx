@@ -8,6 +8,7 @@ import {
 } from "~/lib/learning-content";
 
 export const Route = createFileRoute("/learn/$concept")({
+  ssr: true,
   component: ConceptPage,
   loader: ({ params }) => {
     const conceptEntry = getConceptById(params.concept);

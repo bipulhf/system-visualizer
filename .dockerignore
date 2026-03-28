@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+**/.output
+**/dist
+**/.tanstack
+**/.vite
+**/.turbo
+**/coverage
+**/.DS_Store

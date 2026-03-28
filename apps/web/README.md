@@ -1,36 +1,20 @@
-# TanStack Start - Basic Example
+# @visualizer/web
 
-This is the basic TanStack Start example, demonstrating the fundamentals of building applications with TanStack Router and TanStack Start.
+Frontend application for System Visualizer, built with TanStack Start and TanStack Router.
 
-- [TanStack Router Docs](https://tanstack.com/router)
+## Scripts
 
-It's deployed automagically with Netlify!
-
-- [Netlify](https://netlify.com/)
-
-## Start a new project based on this example
-
-To start a new project based on this example, run:
-
-```sh
-npx gitpick TanStack/router/tree/main/examples/react/start-basic start-basic
+```bash
+bun run dev
+bun run typecheck
+bun run build
+bun run start
 ```
 
-## Getting Started
+## Notes
 
-From your terminal:
+- Scenario routes are configured for client rendering (`ssr: false`) to keep the simulation runtime browser-driven.
+- Landing and learn routes are SSR-enabled for faster first contentful paint and SEO-friendly HTML.
+- WebSocket URL is configured via `VITE_SIMULATION_WS_URL` (see root `.env.example`).
 
-```sh
-pnpm install
-pnpm dev
-```
-
-This starts your app in development mode, rebuilding assets on file changes.
-
-## Build
-
-To build the app for production:
-
-```sh
-pnpm build
-```
+See the workspace root [README.md](../../README.md) for full setup and deployment.

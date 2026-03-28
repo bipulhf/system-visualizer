@@ -7,6 +7,7 @@ import {
 } from "~/lib/learning-content";
 
 export const Route = createFileRoute("/learn/")({
+  ssr: true,
   component: LearnIndexPage,
 });
 

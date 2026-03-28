@@ -49,7 +49,29 @@ type RawSimulationEvent = {
 
 function resolveSimulationWsUrl(): string {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${protocol}://localhost:3001/ws/simulation`;
+  const configuredUrl = import.meta.env.VITE_SIMULATION_WS_URL?.trim();
+
+  if (configuredUrl) {
+    if (
+      configuredUrl.startsWith("ws://") ||
+      configuredUrl.startsWith("wss://")
+    ) {
+      return configuredUrl;
+    }
+
+    if (configuredUrl.startsWith("/")) {
+      return `${protocol}://${window.location.host}${configuredUrl}`;
+    }
+
+    return `${protocol}://${configuredUrl}`;
+  }
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return `${protocol}://localhost:3001/ws/simulation`;
+  }
+
+  return `${protocol}://${window.location.host}/ws/simulation`;
 }
 
 function parseSimulationEvent(payload: string): SimulationEvent | null {
