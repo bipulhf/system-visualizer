@@ -8,43 +8,43 @@
 
 ### Frontend (Visualization App)
 
-| Technology | Package | Version | Purpose |
-|---|---|---|---|
-| Runtime | `bun` | 1.3.11 | JS runtime & package manager |
-| Framework | `@tanstack/start` | ^1.120.x | Full-stack React framework (SSR, routing, server functions) |
-| Router | `@tanstack/react-router` | ^1.168.x | Type-safe file-based routing |
-| React | `react` / `react-dom` | ^19.2.x | UI library |
-| Styling | `tailwindcss` | ^4.2.x | Utility-first CSS |
-| UI Components | `shadcn` (CLI 4.x) | copy-paste | Base component primitives (Radix UI under the hood) |
-| UI Theme | Neobrutalism | CSS override | Bold borders, hard shadows, vibrant colors (from neobrutalism.dev) |
-| Animation | `motion` | ^12.38.x | Spring/keyframe animations for data flow |
-| Flow Diagrams | `@xyflow/react` | ^12.10.x | Node/edge graph rendering for architecture diagrams |
-| Charts | `recharts` or shadcn charts | latest | Queue depth, throughput, latency metrics |
-| Icons | `lucide-react` | latest | Consistent iconography |
+| Technology    | Package                     | Version      | Purpose                                                            |
+| ------------- | --------------------------- | ------------ | ------------------------------------------------------------------ |
+| Runtime       | `bun`                       | 1.3.11       | JS runtime & package manager                                       |
+| Framework     | `@tanstack/start`           | ^1.120.x     | Full-stack React framework (SSR, routing, server functions)        |
+| Router        | `@tanstack/react-router`    | ^1.168.x     | Type-safe file-based routing                                       |
+| React         | `react` / `react-dom`       | ^19.2.x      | UI library                                                         |
+| Styling       | `tailwindcss`               | ^4.2.x       | Utility-first CSS                                                  |
+| UI Components | `shadcn` (CLI 4.x)          | copy-paste   | Base component primitives (Radix UI under the hood)                |
+| UI Theme      | Neobrutalism                | CSS override | Bold borders, hard shadows, vibrant colors (from neobrutalism.dev) |
+| Animation     | `motion`                    | ^12.38.x     | Spring/keyframe animations for data flow                           |
+| Flow Diagrams | `@xyflow/react`             | ^12.10.x     | Node/edge graph rendering for architecture diagrams                |
+| Charts        | `recharts` or shadcn charts | latest       | Queue depth, throughput, latency metrics                           |
+| Icons         | `lucide-react`              | latest       | Consistent iconography                                             |
 
 ### Backend (Simulation Engine)
 
-| Technology | Package | Version | Purpose |
-|---|---|---|---|
-| HTTP Server | `elysia` | ^1.4.x | High-perf Bun-native HTTP server |
-| Redis | `ioredis` | ^5.10.x | Atomic ops, caching, geo, pub/sub |
-| Job Queue | `bullmq` | ^5.71.x | Job scheduling, retries, DLQ, parent/child flows |
-| Message Broker | `amqplib` | ^1.0.x | RabbitMQ fan-out, competing consumers, publisher confirms |
-| Event Streaming | `kafkajs` | ^2.2.x | Immutable event log, consumer groups |
-| Database | `postgres` (postgres.js) | ^3.4.x | PostgreSQL client |
-| ORM | `drizzle-orm` | ^0.45.x | Type-safe SQL queries & migrations |
-| WebSocket | `elysia` built-in WS | — | Real-time event push to frontend |
+| Technology      | Package                  | Version | Purpose                                                   |
+| --------------- | ------------------------ | ------- | --------------------------------------------------------- |
+| HTTP Server     | `elysia`                 | ^1.4.x  | High-perf Bun-native HTTP server                          |
+| Redis           | `ioredis`                | ^5.10.x | Atomic ops, caching, geo, pub/sub                         |
+| Job Queue       | `bullmq`                 | ^5.71.x | Job scheduling, retries, DLQ, parent/child flows          |
+| Message Broker  | `amqplib`                | ^1.0.x  | RabbitMQ fan-out, competing consumers, publisher confirms |
+| Event Streaming | `kafkajs`                | ^2.2.x  | Immutable event log, consumer groups                      |
+| Database        | `postgres` (postgres.js) | ^3.4.x  | PostgreSQL client                                         |
+| ORM             | `drizzle-orm`            | ^0.45.x | Type-safe SQL queries & migrations                        |
+| WebSocket       | `elysia` built-in WS     | —       | Real-time event push to frontend                          |
 
 ### Infrastructure (Local Dev)
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Docker Engine | 29.x | Container runtime |
-| Docker Compose | 2.35.x | Multi-service orchestration |
-| PostgreSQL | 17 | Relational database |
-| Redis | 7.4 | In-memory data store |
-| RabbitMQ | 4.1 (management) | Message broker with management UI |
-| Apache Kafka + Zookeeper | Kafka 3.9 / KRaft | Event streaming platform |
+| Technology               | Version           | Purpose                           |
+| ------------------------ | ----------------- | --------------------------------- |
+| Docker Engine            | 29.x              | Container runtime                 |
+| Docker Compose           | 2.35.x            | Multi-service orchestration       |
+| PostgreSQL               | 17                | Relational database               |
+| Redis                    | 7.4               | In-memory data store              |
+| RabbitMQ                 | 4.1 (management)  | Message broker with management UI |
+| Apache Kafka + Zookeeper | Kafka 3.9 / KRaft | Event streaming platform          |
 
 ---
 
@@ -95,21 +95,21 @@ The UI follows the neobrutalism design language applied on top of shadcn/ui:
 ```css
 :root {
   /* Core neobrutalism tokens */
-  --border: oklch(0% 0 0);              /* Pure black borders */
+  --border: oklch(0% 0 0); /* Pure black borders */
   --box-shadow-x: 4px;
   --box-shadow-y: 4px;
   --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px var(--border);
 
   /* Vibrant palette — one accent color per service */
-  --main: oklch(67.47% .1725 259.61);   /* Blue — API/Elysia */
-  --redis: oklch(62% .25 29);           /* Red — Redis */
-  --bullmq: oklch(75% .18 85);          /* Yellow — BullMQ */
-  --rabbitmq: oklch(65% .2 145);        /* Green — RabbitMQ */
-  --kafka: oklch(55% .15 300);          /* Purple — Kafka */
-  --postgres: oklch(60% .15 230);       /* Steel Blue — PostgreSQL */
+  --main: oklch(67.47% 0.1725 259.61); /* Blue — API/Elysia */
+  --redis: oklch(62% 0.25 29); /* Red — Redis */
+  --bullmq: oklch(75% 0.18 85); /* Yellow — BullMQ */
+  --rabbitmq: oklch(65% 0.2 145); /* Green — RabbitMQ */
+  --kafka: oklch(55% 0.15 300); /* Purple — Kafka */
+  --postgres: oklch(60% 0.15 230); /* Steel Blue — PostgreSQL */
 
-  --background: oklch(96% .01 90);      /* Off-white/cream */
-  --foreground: oklch(0% 0 0);          /* Black text */
+  --background: oklch(96% 0.01 90); /* Off-white/cream */
+  --foreground: oklch(0% 0 0); /* Black text */
 }
 ```
 
@@ -303,42 +303,48 @@ All communication between backend and frontend uses a structured WebSocket event
 ```typescript
 // packages/shared/src/events.ts
 
-type ServiceName = "elysia" | "redis" | "bullmq" | "rabbitmq" | "kafka" | "postgres";
+type ServiceName =
+  | "elysia"
+  | "redis"
+  | "bullmq"
+  | "rabbitmq"
+  | "kafka"
+  | "postgres";
 
 type EventKind =
-  | "request.received"      // HTTP request hit the API
-  | "request.rejected"      // Rate limited, duplicate, etc.
-  | "redis.op"              // DECR, SET, GET, GEORADIUS, etc.
-  | "bullmq.job.created"    // Job added to queue
+  | "request.received" // HTTP request hit the API
+  | "request.rejected" // Rate limited, duplicate, etc.
+  | "redis.op" // DECR, SET, GET, GEORADIUS, etc.
+  | "bullmq.job.created" // Job added to queue
   | "bullmq.job.processing" // Worker picked up job
-  | "bullmq.job.completed"  // Job finished
-  | "bullmq.job.failed"     // Job failed (with retry info)
-  | "bullmq.job.dlq"        // Job moved to dead letter queue
-  | "bullmq.job.progress"   // Job progress update (0-100)
-  | "rabbitmq.published"    // Message published to exchange
-  | "rabbitmq.routed"       // Message routed to queue
-  | "rabbitmq.consumed"     // Consumer processed message
-  | "rabbitmq.ack"          // Consumer acknowledged
-  | "kafka.produced"        // Event published to topic
-  | "kafka.consumed"        // Consumer group read event
-  | "postgres.query"        // SQL query executed
-  | "postgres.tx.begin"     // Transaction started
-  | "postgres.tx.commit"    // Transaction committed
-  | "phase.change"          // Scenario phase transition
-  | "scenario.complete";    // Scenario finished
+  | "bullmq.job.completed" // Job finished
+  | "bullmq.job.failed" // Job failed (with retry info)
+  | "bullmq.job.dlq" // Job moved to dead letter queue
+  | "bullmq.job.progress" // Job progress update (0-100)
+  | "rabbitmq.published" // Message published to exchange
+  | "rabbitmq.routed" // Message routed to queue
+  | "rabbitmq.consumed" // Consumer processed message
+  | "rabbitmq.ack" // Consumer acknowledged
+  | "kafka.produced" // Event published to topic
+  | "kafka.consumed" // Consumer group read event
+  | "postgres.query" // SQL query executed
+  | "postgres.tx.begin" // Transaction started
+  | "postgres.tx.commit" // Transaction committed
+  | "phase.change" // Scenario phase transition
+  | "scenario.complete"; // Scenario finished
 
 interface SimulationEvent {
-  id: string;                // Unique event ID
-  timestamp: number;         // Unix ms
-  scenario: string;          // "flash-sale" | "ride-sharing" | etc.
-  phase: number;             // Current phase (1-5)
+  id: string; // Unique event ID
+  timestamp: number; // Unix ms
+  scenario: string; // "flash-sale" | "ride-sharing" | etc.
+  phase: number; // Current phase (1-5)
   kind: EventKind;
-  source: ServiceName;       // Which service emitted this
-  target?: ServiceName;      // Where data is flowing to (for edge animation)
+  source: ServiceName; // Which service emitted this
+  target?: ServiceName; // Where data is flowing to (for edge animation)
   data: Record<string, unknown>; // Event-specific payload
-  latencyMs: number;         // How long this operation took
-  description: string;       // Human-readable explanation
-  learnMore?: string;        // Educational context (shown in event log expand)
+  latencyMs: number; // How long this operation took
+  description: string; // Human-readable explanation
+  learnMore?: string; // Educational context (shown in event log expand)
 }
 ```
 
@@ -349,22 +355,23 @@ interface SimulationEvent {
 ### Phase 0: Project Bootstrap (Days 1-2)
 
 **Goal:** Working monorepo with all infrastructure running locally.
+**Status:** Completed
 
-- [ ] Initialize Bun workspace monorepo (`apps/web`, `apps/server`, `packages/shared`)
-- [ ] Set up TanStack Start app with file-based routing
-- [ ] Set up Elysia.js server with basic health check endpoint
-- [ ] Set up shared types package
-- [ ] Create `docker-compose.yml` with all services:
+- [x] Initialize Bun workspace monorepo (`apps/web`, `apps/server`, `packages/shared`)
+- [x] Set up TanStack Start app with file-based routing
+- [x] Set up Elysia.js server with basic health check endpoint
+- [x] Set up shared types package
+- [x] Create `docker-compose.yml` with all services:
   - PostgreSQL 17
   - Redis 7.4
   - RabbitMQ 4.1 (with management plugin on :15672)
   - Kafka 3.9 (KRaft mode, no Zookeeper)
-- [ ] Verify all services connect from Elysia.js
-- [ ] Initialize shadcn/ui with Tailwind v4
-- [ ] Apply neobrutalism CSS overrides (global tokens, border/shadow utilities)
-- [ ] Install DM Sans font
-- [ ] Set up dark mode toggle with CSS variable swap
-- [ ] Create base layout components (top-nav, sidebar shell, main canvas area)
+- [x] Verify all services connect from Elysia.js
+- [x] Initialize shadcn/ui with Tailwind v4
+- [x] Apply neobrutalism CSS overrides (global tokens, border/shadow utilities)
+- [x] Install DM Sans font
+- [x] Set up dark mode toggle with CSS variable swap
+- [x] Create base layout components (top-nav, sidebar shell, main canvas area)
 
 **Deliverable:** Monorepo boots, `docker compose up` runs all infra, frontend shows styled skeleton layout, backend connects to all services.
 
@@ -375,6 +382,7 @@ interface SimulationEvent {
 **Goal:** Animated architecture diagram that responds to real-time events.
 
 #### Backend
+
 - [ ] Implement WebSocket endpoint in Elysia.js (`/ws/simulation`)
 - [ ] Create central `EventEmitter` that all service wrappers emit through
 - [ ] Wire EventEmitter → WebSocket broadcast
@@ -386,6 +394,7 @@ interface SimulationEvent {
   - `postgres.ts` — wraps drizzle queries, emits on query/transaction
 
 #### Frontend
+
 - [ ] Build `use-simulation` hook (WebSocket connect, reconnect, message parsing)
 - [ ] Build `flow-canvas.tsx` with @xyflow/react
 - [ ] Create custom `service-node.tsx` — neobrutalism styled node per service with:
@@ -467,6 +476,7 @@ interface SimulationEvent {
 **Goal:** First complete end-to-end scenario fully working.
 
 #### Backend Simulation (`scenarios/flash-sale.ts`)
+
 - [ ] Phase 1 — The Spike:
   - Simulate 10,000 requests hitting Elysia (configurable count)
   - Redis `DECR stock:item_42` — 100 succeed, rest rejected
@@ -494,6 +504,7 @@ interface SimulationEvent {
   - Emit events: `postgres.tx.begin`, `postgres.query`, `postgres.tx.commit`
 
 #### Frontend Integration
+
 - [ ] Wire flash-sale route to simulation hook
 - [ ] Configure @xyflow graph layout for this scenario's architecture
 - [ ] Map all event kinds to node/edge animations
@@ -507,6 +518,7 @@ interface SimulationEvent {
 - [ ] Concept cards triggered: "Atomic Operation", "Thundering Herd", "Fan-Out Pattern", "Dead Letter Queue", "Event Sourcing"
 
 #### Testing & Polish
+
 - [ ] End-to-end run: start simulation, watch all 4 phases animate
 - [ ] Verify event log shows correct flow
 - [ ] Verify activity monitor shows real metrics
@@ -519,6 +531,7 @@ interface SimulationEvent {
 ### Phase 4: Scenario 2 — Ride-Sharing Live Dispatch (Days 16-19)
 
 #### Backend Simulation (`scenarios/ride-sharing.ts`)
+
 - [ ] Phase 1 — Driver Heartbeat:
   - Simulate N drivers sending GPS coords every 2s
   - Redis `GEOADD` + 30s TTL per driver
@@ -541,6 +554,7 @@ interface SimulationEvent {
   - PostgreSQL write only at trip completion
 
 #### Frontend Integration
+
 - [ ] @xyflow layout for ride-sharing architecture
 - [ ] Animated driver dots on a mini-map overlay (or abstract representation)
 - [ ] BullMQ timeout countdown visualization
@@ -555,6 +569,7 @@ interface SimulationEvent {
 ### Phase 5: Scenario 3 — Video Transcoding Pipeline (Days 20-23)
 
 #### Backend Simulation (`scenarios/video-pipeline.ts`)
+
 - [ ] Phase 1 — Upload intake, PostgreSQL insert, BullMQ parent job with 5 children
 - [ ] Phase 2 — Workers process child jobs with progress reporting (0-100%)
   - Redis stores live progress per job with TTL
@@ -565,6 +580,7 @@ interface SimulationEvent {
 - [ ] Phase 5 — PostgreSQL final update, Redis TTL cleanup
 
 #### Frontend Integration
+
 - [ ] @xyflow layout with parent/child job tree visualization
 - [ ] Progress bars on each child job node (animated 0→100%)
 - [ ] DLQ visualization — failed job moves to separate "graveyard" node
@@ -580,6 +596,7 @@ interface SimulationEvent {
 ### Phase 6: Scenario 4 — Banking Transaction Ledger (Days 24-27)
 
 #### Backend Simulation (`scenarios/banking.ts`)
+
 - [ ] Phase 1 — Redis rate limit, idempotency check, account lock
 - [ ] Phase 2 — PostgreSQL SERIALIZABLE transaction (debit, credit, ledger entry)
   - Redis idempotency record with 24h TTL
@@ -591,6 +608,7 @@ interface SimulationEvent {
 - [ ] Phase 5 — Audit query reads from PostgreSQL + Kafka backup
 
 #### Frontend Integration
+
 - [ ] @xyflow layout emphasizing data integrity flow
 - [ ] Redis idempotency visualization — duplicate request bouncing off
 - [ ] PostgreSQL transaction as a grouped atomic block (visual grouping)
@@ -607,12 +625,14 @@ interface SimulationEvent {
 ### Phase 7: Landing Page, Learn Section & Polish (Days 28-32)
 
 #### Landing Page (`routes/index.tsx`)
+
 - [ ] Hero section: bold neobrutalism typography, tagline, animated preview
 - [ ] 4 scenario cards with preview thumbnails and difficulty tags
 - [ ] "What you'll learn" section — grid of technology icons with one-liner descriptions
 - [ ] Quick-start CTA → jumps to Scenario 1
 
 #### Learn Section (`routes/learn/`)
+
 - [ ] Concepts glossary page — all concepts from all scenarios in a searchable grid
 - [ ] Individual concept pages with:
   - Clear definition
@@ -621,6 +641,7 @@ interface SimulationEvent {
   - "See it in action" link → jumps to the relevant scenario + phase
 
 #### Scenario Comparison View
+
 - [ ] Post-scenario summary card:
   - Technologies used and their roles
   - Total events processed, messages routed, jobs completed
@@ -629,6 +650,7 @@ interface SimulationEvent {
 - [ ] Cross-scenario comparison: "Redis in Flash Sale vs Banking" — same tech, different purpose
 
 #### Polish
+
 - [ ] Responsive layout (desktop-first, tablet-friendly)
 - [ ] Keyboard shortcuts (Space = pause, Arrow keys = step, 1-4 = speed presets)
 - [ ] Loading states with neobrutalism skeleton animations
@@ -655,6 +677,7 @@ interface SimulationEvent {
 ## Key Design Decisions
 
 ### Why TanStack Start over Next.js?
+
 - Type-safe routing with zero runtime overhead
 - File-based routing with full TypeScript inference
 - Server functions for any SSR data needs (learn pages, concept content)
@@ -662,24 +685,28 @@ interface SimulationEvent {
 - No React Server Components complexity for a primarily client-rendered app
 
 ### Why @xyflow/react over pure D3?
+
 - Built-in node/edge management, pan/zoom, minimap
 - Custom React components as nodes (service cards with state)
 - Handles layout calculation and edge routing
 - D3 would require building all graph interaction from scratch
 
 ### Why real infrastructure instead of mocking?
+
 - The visualization is truthful — events come from actual Redis, BullMQ, RabbitMQ, Kafka operations
 - Latency numbers are real, not fabricated
 - Failure modes are genuine (DLQ happens because a real job really failed)
 - Students see that these tools actually work this way, not just in theory
 
 ### Why separate event log + flow graph + activity monitor?
+
 - Flow graph answers "where is data going?"
 - Activity monitor answers "how busy is each service?"
 - Event log answers "what exactly happened and why?"
 - Three complementary views = complete understanding
 
 ### Why Bun throughout?
+
 - Single runtime for frontend + backend
 - Native TypeScript support without build step for server
 - Fastest package manager

@@ -1,0 +1,11 @@
+node_modules
+.bun
+.DS_Store
+.env
+.env.*
+!.env.example
+apps/web/.output
+apps/web/.tanstack
+apps/web/dist
+apps/server/dist
+packages/shared/dist

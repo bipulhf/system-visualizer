@@ -1,0 +1,92 @@
+@import "tailwindcss" source("../");
+@import "@fontsource-variable/dm-sans";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --border: oklch(0% 0 0);
+  --box-shadow-x: 4px;
+  --box-shadow-y: 4px;
+  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0 0 var(--border);
+
+  --main: oklch(67.47% 0.1725 259.61);
+  --redis: oklch(62% 0.25 29);
+  --bullmq: oklch(75% 0.18 85);
+  --rabbitmq: oklch(65% 0.2 145);
+  --kafka: oklch(55% 0.15 300);
+  --postgres: oklch(60% 0.15 230);
+
+  --background: oklch(96% 0.01 90);
+  --surface: oklch(99% 0.01 90);
+  --foreground: oklch(0% 0 0);
+}
+
+.dark {
+  --main: oklch(76% 0.15 255);
+  --redis: oklch(69% 0.21 29);
+  --bullmq: oklch(81% 0.14 90);
+  --rabbitmq: oklch(74% 0.16 145);
+  --kafka: oklch(75% 0.12 295);
+  --postgres: oklch(75% 0.11 235);
+
+  --background: oklch(20% 0.02 260);
+  --surface: oklch(25% 0.03 260);
+  --foreground: oklch(98% 0.01 95);
+}
+
+@theme {
+  --font-heading: "DM Sans Variable", sans-serif;
+  --font-base: "DM Sans Variable", sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+  }
+
+  body {
+    background:
+      radial-gradient(
+        circle at 12% 22%,
+        color-mix(in oklch, var(--main) 18%, transparent) 0,
+        transparent 34%
+      ),
+      radial-gradient(
+        circle at 88% 78%,
+        color-mix(in oklch, var(--redis) 20%, transparent) 0,
+        transparent 30%
+      ),
+      var(--background);
+    color: var(--foreground);
+    font-family: var(--font-base);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@utility neo-panel {
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+@utility neo-press {
+  transform: translate(
+    calc(-1 * var(--box-shadow-x)),
+    calc(-1 * var(--box-shadow-y))
+  );
+  box-shadow: none;
+}
