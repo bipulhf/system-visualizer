@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "~/components/ui/button";
 import type { SimulationEvent } from "~/lib/event-types";
 import {
   scenarioInfoById,
@@ -72,67 +73,66 @@ export function SummaryCard({
 
   return (
     <section
-      className="neo-panel mt-3 grid gap-3 bg-[var(--surface)] p-3 lg:grid-cols-[1.1fr,1fr]"
+      className="card mt-3 grid gap-4 rounded-xl p-4 lg:grid-cols-[1.1fr,1fr]"
       aria-live="polite"
     >
-      <article className="space-y-2">
-        <h3 className="text-sm font-black uppercase tracking-wide">
-          Scenario Summary
-        </h3>
-        <p className="text-sm font-black">{scenarioInfo.title}</p>
-        <p className="text-xs leading-relaxed">{scenarioInfo.tagline}</p>
+      <article className="space-y-3">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Scenario Complete
+          </h3>
+          <p className="mt-1 text-base font-semibold">{scenarioInfo.title}</p>
+          <p className="text-xs leading-relaxed text-[var(--muted)]">
+            {scenarioInfo.tagline}
+          </p>
+        </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs font-semibold sm:grid-cols-4">
-          <div className="neo-panel bg-[var(--background)] p-2">
-            Events
-            <p className="mt-1 text-base font-black">{stats.totalEvents}</p>
+        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          <div className="card-inset rounded-lg p-2.5">
+            <p className="text-[var(--muted)]">Events</p>
+            <p className="mt-0.5 text-lg font-bold">{stats.totalEvents}</p>
           </div>
-          <div className="neo-panel bg-[var(--background)] p-2">
-            Routed Msgs
-            <p className="mt-1 text-base font-black">{stats.totalMessages}</p>
+          <div className="card-inset rounded-lg p-2.5">
+            <p className="text-[var(--muted)]">Routed</p>
+            <p className="mt-0.5 text-lg font-bold">{stats.totalMessages}</p>
           </div>
-          <div className="neo-panel bg-[var(--background)] p-2">
-            Failures
-            <p className="mt-1 text-base font-black">{stats.totalFailures}</p>
+          <div className="card-inset rounded-lg p-2.5">
+            <p className="text-[var(--muted)]">Failures</p>
+            <p className="mt-0.5 text-lg font-bold">{stats.totalFailures}</p>
           </div>
-          <div className="neo-panel bg-[var(--background)] p-2">
-            Avg Latency
-            <p className="mt-1 text-base font-black">{stats.avgLatencyMs}ms</p>
+          <div className="card-inset rounded-lg p-2.5">
+            <p className="text-[var(--muted)]">Avg ms</p>
+            <p className="mt-0.5 text-lg font-bold">{stats.avgLatencyMs}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link
-            to={scenarioPathById[scenarioId]}
-            className="neo-panel inline-flex h-10 items-center bg-[var(--main)] px-3 text-xs font-black uppercase tracking-wide transition-transform duration-150 hover:-translate-x-[var(--box-shadow-x)] hover:-translate-y-[var(--box-shadow-y)] hover:shadow-none"
-          >
-            Replay Scenario
-          </Link>
-          <Link
-            to="/learn"
-            className="neo-panel inline-flex h-10 items-center bg-[var(--surface)] px-3 text-xs font-black uppercase tracking-wide"
-          >
-            Review Concepts
-          </Link>
+          <Button asChild>
+            <Link to={scenarioPathById[scenarioId]}>Replay Scenario</Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link to="/learn">Review Concepts</Link>
+          </Button>
         </div>
       </article>
 
-      <article className="neo-panel bg-[var(--background)] p-3">
-        <h4 className="text-xs font-black uppercase tracking-wide">
-          Cross-Scenario Comparison
+      <article className="card-inset rounded-xl p-3">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+          Cross-Scenario: Redis
         </h4>
-        <p className="mt-2 text-xs font-black uppercase tracking-wide">
-          Redis In Flash Sale vs Banking
-        </p>
-        <ul className="mt-2 space-y-2 text-xs leading-relaxed">
-          <li className="neo-panel bg-[var(--surface)] p-2">
+        <p className="mt-1.5 text-xs font-semibold">Flash Sale vs Banking</p>
+        <ul className="mt-2 space-y-1.5 text-xs">
+          <li className="card-inset rounded-lg p-2 leading-relaxed">
             Flash Sale: {redisComparisonByScenario["flash-sale"]}
           </li>
-          <li className="neo-panel bg-[var(--surface)] p-2">
+          <li className="card-inset rounded-lg p-2 leading-relaxed">
             Banking: {redisComparisonByScenario.banking}
           </li>
-          <li className="neo-panel bg-[var(--surface)] p-2">
-            Current Scenario Insight: {redisComparisonByScenario[scenarioId]}
+          <li
+            className="card-inset rounded-lg p-2 leading-relaxed font-medium"
+            style={{ color: "var(--main)" }}
+          >
+            Current: {redisComparisonByScenario[scenarioId]}
           </li>
         </ul>
       </article>

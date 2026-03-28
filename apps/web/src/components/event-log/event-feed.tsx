@@ -112,10 +112,12 @@ export function EventFeed({ events }: { events: SimulationEvent[] }) {
   };
 
   return (
-    <section className="neo-panel bg-[var(--surface)] p-3">
-      <h3 className="text-xs font-bold uppercase tracking-wider">Event Log</h3>
+    <section className="card rounded-xl p-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+        Event Log
+      </h3>
 
-      <div className="mt-2">
+      <div className="mt-2.5">
         <LogFilters
           activeServices={activeServices}
           activeKinds={activeKinds}
@@ -129,13 +131,13 @@ export function EventFeed({ events }: { events: SimulationEvent[] }) {
       </div>
 
       {filteredEvents.length === 0 ? (
-        <p className="mt-2 text-xs font-semibold opacity-75">
+        <p className="mt-3 text-xs text-[var(--muted)]">
           No events match current filters.
         </p>
       ) : (
         <>
           <div
-            className="mt-2 max-h-64 overflow-auto pr-1"
+            className="mt-2.5 max-h-64 overflow-auto"
             onScroll={(event) => {
               setScrollTop(event.currentTarget.scrollTop);
             }}
@@ -145,7 +147,7 @@ export function EventFeed({ events }: { events: SimulationEvent[] }) {
               style={{ height: `${visibleWindow.totalHeight}px` }}
             >
               <ul
-                className="absolute left-0 right-0 space-y-1"
+                className="absolute left-0 right-0 space-y-0.5"
                 style={{
                   transform: `translateY(${visibleWindow.offsetTop}px)`,
                 }}
@@ -165,19 +167,19 @@ export function EventFeed({ events }: { events: SimulationEvent[] }) {
           </div>
 
           {selectedEvent ? (
-            <article className="neo-panel mt-2 bg-[var(--background)] p-2 text-[11px]">
-              <p className="font-black uppercase tracking-wide">
+            <article className="card-inset mt-2.5 rounded-lg p-2.5 text-[11px]">
+              <p className="text-xs font-semibold text-[var(--muted)]">
                 Event Details
               </p>
-              <p className="mt-1 font-bold">
-                Latency: {selectedEvent.latencyMs} ms
+              <p className="mt-1">
+                <span className="text-[var(--muted)]">Latency:</span>{" "}
+                <span className="font-medium">{selectedEvent.latencyMs} ms</span>
               </p>
-              <p className="mt-1 font-bold">
-                Learn More:{" "}
+              <p className="mt-0.5 leading-relaxed text-[var(--muted)]">
                 {selectedEvent.learnMore ??
                   learnMoreByEventKind[selectedEvent.kind]}
               </p>
-              <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-all bg-[var(--surface)] p-1.5 font-mono text-[10px]">
+              <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-all rounded-md bg-[var(--surface)] p-1.5 font-mono text-[10px]">
                 {JSON.stringify(selectedEvent.data, null, 2)}
               </pre>
             </article>

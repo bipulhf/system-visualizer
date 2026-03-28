@@ -6,6 +6,7 @@ import {
   type ConceptGlossaryEntry,
   type SupportedScenarioId,
 } from "~/lib/learning-content";
+import { Button } from "~/components/ui/button";
 
 export const Route = createFileRoute("/learn/$concept")({
   ssr: true,
@@ -51,50 +52,48 @@ function ConceptPage() {
   };
 
   return (
-    <section className="neo-panel bg-[var(--background)] p-4 md:p-6">
+    <div className="space-y-5 py-2">
       <header className="space-y-2">
-        <Link
-          to="/learn"
-          className="neo-panel inline-flex h-9 items-center bg-[var(--surface)] px-3 text-[11px] font-black uppercase tracking-wide"
-        >
-          Back To Glossary
-        </Link>
-        <h1 className="text-3xl font-black tracking-tight">
+        <Button asChild variant="secondary" size="sm">
+          <Link to="/learn">← Back to Glossary</Link>
+        </Button>
+        <h1 className="text-2xl font-bold tracking-tight">
           {conceptEntry.title}
         </h1>
-        <p className="max-w-3xl text-sm font-semibold leading-relaxed">
+        <p className="max-w-3xl text-sm leading-relaxed text-[var(--muted)]">
           {conceptEntry.description}
         </p>
       </header>
 
-      <section className="mt-4 grid gap-3 lg:grid-cols-[1.2fr,1fr]">
-        <article className="neo-panel bg-[var(--surface)] p-3">
-          <h2 className="text-xs font-black uppercase tracking-wide">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
+        <article className="card rounded-xl p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Where It Appears
           </h2>
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-3 space-y-2.5">
             {conceptEntry.scenarioIds.map((scenarioId: SupportedScenarioId) => {
               const phase = getRecommendedPhase(scenarioId, conceptEntry.id);
 
               return (
                 <li
                   key={scenarioId}
-                  className="neo-panel bg-[var(--background)] p-2"
+                  className="card-inset rounded-lg p-3"
                 >
-                  <p className="text-sm font-black">
+                  <p className="text-sm font-semibold">
                     {scenarioInfoById[scenarioId].title}
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed">
+                  <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
                     {scenarioInfoById[scenarioId].tagline}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Link
-                      to={scenarioPathById[scenarioId]}
-                      search={{ phase }}
-                      className="neo-panel inline-flex h-9 items-center bg-[var(--main)] px-3 text-[11px] font-black uppercase tracking-wide transition-transform duration-150 hover:-translate-x-[var(--box-shadow-x)] hover:-translate-y-[var(--box-shadow-y)] hover:shadow-none"
-                    >
-                      See It In Action (Phase {phase})
-                    </Link>
+                  <div className="mt-2.5">
+                    <Button asChild size="sm">
+                      <Link
+                        to={scenarioPathById[scenarioId]}
+                        search={{ phase }}
+                      >
+                        See It In Action — Phase {phase}
+                      </Link>
+                    </Button>
                   </div>
                 </li>
               );
@@ -103,30 +102,37 @@ function ConceptPage() {
         </article>
 
         <div className="space-y-3">
-          <article className="neo-panel bg-[var(--surface)] p-3">
-            <h2 className="text-xs font-black uppercase tracking-wide">
+          <article className="card rounded-xl p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Visual Diagram
             </h2>
-            <div className="mt-2 grid grid-cols-[1fr,auto,1fr] items-center gap-2">
-              <div className="neo-panel bg-[var(--background)] p-2 text-center text-[11px] font-black uppercase">
+            <div className="mt-3 grid grid-cols-[1fr,auto,1fr] items-center gap-2">
+              <div className="card-inset rounded-md p-2 text-center text-xs font-medium">
                 Incoming Event
               </div>
-              <span className="text-xs font-black">→</span>
-              <div className="neo-panel bg-[var(--main)]/25 p-2 text-center text-[11px] font-black uppercase">
+              <span className="text-sm text-[var(--muted)]">→</span>
+              <div
+                className="rounded-md p-2 text-center text-xs font-semibold"
+                style={{
+                  background: `color-mix(in oklch, var(--main) 15%, transparent)`,
+                  color: `var(--main)`,
+                  border: `1px solid color-mix(in oklch, var(--main) 30%, transparent)`,
+                }}
+              >
                 {conceptEntry.title}
               </div>
             </div>
           </article>
 
-          <article className="neo-panel bg-[var(--surface)] p-3">
-            <h2 className="text-xs font-black uppercase tracking-wide">
+          <article className="card rounded-xl p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Trigger Events
             </h2>
-            <ul className="mt-2 space-y-1">
+            <ul className="mt-3 space-y-1.5">
               {conceptEntry.triggerKinds.map((triggerKind: string) => (
                 <li
                   key={triggerKind}
-                  className="neo-panel bg-[var(--background)] px-2 py-1 text-xs font-bold"
+                  className="card-inset rounded-md px-2.5 py-1.5 text-xs font-medium"
                 >
                   {triggerKind}
                 </li>
@@ -134,7 +140,7 @@ function ConceptPage() {
             </ul>
           </article>
         </div>
-      </section>
-    </section>
+      </div>
+    </div>
   );
 }

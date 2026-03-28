@@ -5,6 +5,7 @@ import {
   scenarioInfoById,
   type SupportedScenarioId,
 } from "~/lib/learning-content";
+import { Button } from "~/components/ui/button";
 
 export const Route = createFileRoute("/learn/")({
   ssr: true,
@@ -42,22 +43,22 @@ function LearnIndexPage() {
   }, [concepts, query]);
 
   return (
-    <section className="neo-panel bg-[var(--background)] p-4 md:p-6">
+    <div className="space-y-5 py-2">
       <header className="space-y-2">
-        <p className="inline-flex border-2 border-[var(--border)] bg-[var(--bullmq)] px-2 py-1 text-[11px] font-black uppercase tracking-wide">
+        <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-xs font-medium text-[var(--muted)]">
           Learn Section
-        </p>
-        <h1 className="text-3xl font-black tracking-tight">Concept Glossary</h1>
-        <p className="max-w-2xl text-sm font-semibold leading-relaxed">
+        </span>
+        <h1 className="text-2xl font-bold tracking-tight">Concept Glossary</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
           Search distributed systems concepts and jump directly into the
           scenario where each concept appears in a live simulation.
         </p>
       </header>
 
-      <div className="mt-3 neo-panel bg-[var(--surface)] p-3">
+      <div className="card rounded-xl p-4">
         <label
           htmlFor="concept-search"
-          className="text-xs font-black uppercase tracking-wide"
+          className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]"
         >
           Search Concepts
         </label>
@@ -69,23 +70,23 @@ function LearnIndexPage() {
             setQuery(event.currentTarget.value);
           }}
           placeholder="Type concept, scenario, or keyword"
-          className="mt-2 h-11 w-full border-2 border-[var(--border)] bg-[var(--background)] px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--main)]"
+          className="mt-2 h-10 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm outline-none transition-colors focus-visible:border-[var(--main)] focus-visible:ring-2 focus-visible:ring-[var(--main)]/20"
         />
       </div>
 
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2">
         {filteredConcepts.map((concept) => (
-          <li key={concept.id} className="neo-panel bg-[var(--surface)] p-3">
-            <p className="text-base font-black">{concept.title}</p>
-            <p className="mt-1 text-sm leading-relaxed">
+          <li key={concept.id} className="card card-interactive rounded-xl p-4">
+            <p className="text-sm font-semibold">{concept.title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
               {concept.description}
             </p>
 
-            <div className="mt-2 flex flex-wrap gap-1">
+            <div className="mt-2.5 flex flex-wrap gap-1">
               {concept.scenarioIds.map((scenarioId) => (
                 <span
                   key={`${concept.id}-${scenarioId}`}
-                  className="inline-flex border-2 border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[10px] font-black uppercase tracking-wide"
+                  className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
                 >
                   {scenarioInfoById[scenarioId].title}
                 </span>
@@ -93,23 +94,22 @@ function LearnIndexPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link
-                to="/learn/$concept"
-                params={{ concept: concept.id }}
-                className="neo-panel inline-flex h-10 items-center justify-center bg-[var(--main)] px-3 text-xs font-black uppercase tracking-wide transition-transform duration-150 hover:-translate-x-[var(--box-shadow-x)] hover:-translate-y-[var(--box-shadow-y)] hover:shadow-none"
-              >
-                Open Concept
-              </Link>
-              <Link
-                to={scenarioPathById[concept.scenarioIds[0] ?? "flash-sale"]}
-                className="neo-panel inline-flex h-10 items-center justify-center bg-[var(--surface)] px-3 text-xs font-black uppercase tracking-wide"
-              >
-                See In Action
-              </Link>
+              <Button asChild size="sm">
+                <Link to="/learn/$concept" params={{ concept: concept.id }}>
+                  Open Concept
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link
+                  to={scenarioPathById[concept.scenarioIds[0] ?? "flash-sale"]}
+                >
+                  See In Action
+                </Link>
+              </Button>
             </div>
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }

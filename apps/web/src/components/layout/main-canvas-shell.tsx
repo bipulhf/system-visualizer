@@ -262,12 +262,12 @@ function RideSharingOverlay({ events }: { events: SimulationEvent[] }) {
   const snapshot = useMemo(() => buildRideOverlaySnapshot(events), [events]);
 
   return (
-    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 sm:grid-cols-[1fr,220px]">
+    <section className="card mt-3 grid gap-2 rounded-xl p-3 sm:grid-cols-[1fr,220px]">
       <div>
-        <p className="text-[11px] font-black uppercase tracking-wide">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Dispatch Timeout
         </p>
-        <p className="text-sm font-black">
+        <p className="text-sm font-semibold">
           {snapshot.latestCountdownSec === null
             ? "Waiting for dispatch"
             : `${snapshot.latestCountdownSec}s remaining`}
@@ -285,8 +285,8 @@ function RideSharingOverlay({ events }: { events: SimulationEvent[] }) {
         </p>
       </div>
 
-      <div className="neo-panel relative h-24 overflow-hidden bg-[var(--background)]">
-        <div className="absolute inset-2 rounded-sm border-2 border-dashed border-[var(--border)]/60" />
+      <div className="card-inset relative h-24 overflow-hidden rounded-lg">
+        <div className="absolute inset-2 rounded-md border border-dashed border-[var(--border)]/60" />
         {snapshot.driverPoints.map((point) => (
           <span
             key={point.driverId}
@@ -297,7 +297,7 @@ function RideSharingOverlay({ events }: { events: SimulationEvent[] }) {
             }}
           />
         ))}
-        <p className="absolute bottom-1 right-1 text-[10px] font-black uppercase">
+        <p className="absolute bottom-1 right-1 text-[10px] font-medium text-[var(--muted)]">
           drivers {snapshot.driverPoints.length}
         </p>
       </div>
@@ -418,9 +418,9 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
   );
 
   return (
-    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 lg:grid-cols-[1.4fr,1fr]">
-      <article className="neo-panel bg-[var(--background)] p-2">
-        <p className="text-[11px] font-black uppercase tracking-wide">
+    <section className="card mt-3 grid gap-2 rounded-xl p-3 lg:grid-cols-[1.4fr,1fr]">
+      <article className="card-inset rounded-lg p-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Parent-Child Rendition Progress
         </p>
         <div className="mt-2 space-y-2">
@@ -434,9 +434,9 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
                   <span>{rendition}</span>
                   <span>{inDlq ? "dlq" : `${progress}%`}</span>
                 </div>
-                <div className="h-2 overflow-hidden border-2 border-[var(--border)] bg-[var(--background)]">
+                <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
                   <div
-                    className={`${inDlq ? "bg-red-500" : "bg-[var(--bullmq)]"} h-full transition-[width] duration-200`}
+                    className={`${inDlq ? "bg-red-500" : "bg-[var(--bullmq)]"} h-full rounded-full transition-[width] duration-200`}
                     style={{ width: `${inDlq ? 100 : progress}%` }}
                   />
                 </div>
@@ -444,7 +444,7 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
             );
           })}
         </div>
-        <p className="mt-2 text-xs font-black uppercase tracking-wide">
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           DLQ Graveyard:{" "}
           {snapshot.dlqRenditions.length > 0
             ? snapshot.dlqRenditions.join(", ")
@@ -453,8 +453,8 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
       </article>
 
       <article className="grid gap-2">
-        <div className="neo-panel bg-[var(--background)] p-2">
-          <p className="text-[11px] font-black uppercase tracking-wide">
+        <div className="card-inset rounded-lg p-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             RabbitMQ Routing Keys
           </p>
           <div className="mt-2 space-y-1 text-xs">
@@ -470,8 +470,8 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
           </div>
         </div>
 
-        <div className="neo-panel bg-[var(--background)] p-2">
-          <p className="text-[11px] font-black uppercase tracking-wide">
+        <div className="card-inset rounded-lg p-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Kafka Consumer Speeds
           </p>
           <div className="mt-2 space-y-1 text-xs">
@@ -621,9 +621,9 @@ function BankingOverlay({ events }: { events: SimulationEvent[] }) {
   const replicaPerNode = Math.ceil(snapshot.replicaWrites / 3);
 
   return (
-    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 lg:grid-cols-[1.2fr,1fr,1fr]">
-      <article className="neo-panel bg-[var(--background)] p-2">
-        <p className="text-[11px] font-black uppercase tracking-wide">
+    <section className="card mt-3 grid gap-2 rounded-xl p-3 lg:grid-cols-[1.2fr,1fr,1fr]">
+      <article className="card-inset rounded-lg p-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Idempotency + Serializable Gate
         </p>
         <p className="mt-1 text-xs font-semibold">
@@ -634,13 +634,13 @@ function BankingOverlay({ events }: { events: SimulationEvent[] }) {
         </p>
         <p className="text-xs font-semibold">TX begin: {snapshot.txBegins}</p>
         <p className="text-xs font-semibold">TX commit: {snapshot.txCommits}</p>
-        <p className="mt-1 text-xs font-black uppercase tracking-wide">
+        <p className="mt-1 text-xs font-semibold">
           In-flight transaction blocks: {inFlightTransactions}
         </p>
       </article>
 
-      <article className="neo-panel bg-[var(--background)] p-2">
-        <p className="text-[11px] font-black uppercase tracking-wide">
+      <article className="card-inset rounded-lg p-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Fraud Hold Review Queue
         </p>
         <p className="mt-1 text-xs font-semibold">
@@ -653,14 +653,14 @@ function BankingOverlay({ events }: { events: SimulationEvent[] }) {
           Completed reviews: {snapshot.reviewCompleted}
         </p>
         <p className="text-xs font-semibold">Queue depth: {reviewDepth}</p>
-        <p className="mt-1 text-xs font-black uppercase tracking-wide">
+        <p className="mt-1 text-xs font-semibold">
           Countdown: {snapshot.latestReviewCountdownSec ?? "-"}
           {snapshot.latestReviewCountdownSec === null ? "" : "s"}
         </p>
       </article>
 
-      <article className="neo-panel bg-[var(--background)] p-2">
-        <p className="text-[11px] font-black uppercase tracking-wide">
+      <article className="card-inset rounded-lg p-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Kafka Replication + Audit
         </p>
         <p className="mt-1 text-xs font-semibold">
@@ -673,13 +673,13 @@ function BankingOverlay({ events }: { events: SimulationEvent[] }) {
           Audit reads: {snapshot.auditReads}
         </p>
         <div className="mt-2 grid grid-cols-3 gap-1">
-          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+          <div className="card-inset rounded-md p-1 text-center text-[10px] font-medium">
             R1
           </div>
-          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+          <div className="card-inset rounded-md p-1 text-center text-[10px] font-medium">
             R2
           </div>
-          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+          <div className="card-inset rounded-md p-1 text-center text-[10px] font-medium">
             R3
           </div>
         </div>
@@ -964,17 +964,17 @@ export function MainCanvasShell({
   };
 
   return (
-    <section className="neo-panel scenario-shell-enter grid min-h-[60dvh] grid-rows-[auto,1fr,auto,auto] gap-3 bg-[var(--background)] p-3">
+    <section className="scenario-shell-enter grid min-h-[60dvh] grid-rows-[auto,1fr,auto,auto] gap-4">
       <section
         id={sectionIdByTarget.tracker}
-        className={`neo-panel relative bg-[var(--surface)] p-3 ${isGuideTarget("tracker") ? "guide-highlight" : ""}`}
+        className={`card relative rounded-xl p-3 ${isGuideTarget("tracker") ? "guide-highlight" : ""}`}
       >
         {isGuideTarget("tracker") ? (
           <span className="guide-badge">LOOK HERE</span>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wide">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Beginner Tracker
             </p>
             <p className="text-sm font-bold">
@@ -1009,24 +1009,24 @@ export function MainCanvasShell({
           </div>
         </div>
 
-        <div className="mt-2 h-3 overflow-hidden border-2 border-[var(--border)] bg-[var(--background)]">
+        <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
           <div
-            className="h-full bg-[var(--main)] transition-[width] duration-200"
+            className="h-full rounded-full bg-[var(--main)] transition-[width] duration-200"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
         <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
-          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+          <p className="card-inset rounded-md px-2 py-1 text-xs font-medium">
             Now: {activePhase?.title ?? "-"}
           </p>
-          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+          <p className="card-inset rounded-md px-2 py-1 text-xs font-medium">
             Next: {nextPhase?.title ?? "Final step reached"}
           </p>
-          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+          <p className="card-inset rounded-md px-2 py-1 text-xs font-medium">
             Events processed: {events.length}
           </p>
-          <p className="neo-panel bg-[var(--background)] px-2 py-1 font-semibold">
+          <p className="card-inset rounded-md px-2 py-1 text-xs font-medium">
             Status: {guidanceMessage}
           </p>
         </div>
@@ -1034,7 +1034,7 @@ export function MainCanvasShell({
 
       <div
         id={sectionIdByTarget.flow}
-        className={`neo-panel relative overflow-hidden bg-[var(--surface)] p-4 ${isGuideTarget("flow") ? "guide-highlight" : ""}`}
+        className={`card relative overflow-hidden rounded-xl p-4 ${isGuideTarget("flow") ? "guide-highlight" : ""}`}
       >
         {isGuideTarget("flow") ? (
           <span className="guide-badge">LOOK HERE</span>
@@ -1042,17 +1042,15 @@ export function MainCanvasShell({
         <div className="absolute -top-16 right-8 h-40 w-40 rounded-full bg-[var(--main)]/25 blur-2xl" />
         <div className="absolute -bottom-14 left-8 h-32 w-32 rounded-full bg-[var(--rabbitmq)]/35 blur-2xl" />
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-black uppercase tracking-wide">
-            Architecture Flow Canvas
-          </h2>
+          <h2 className="text-sm font-semibold">Architecture Flow Canvas</h2>
           <div className="flex items-center gap-2">
-            <span className="neo-panel inline-flex items-center gap-2 bg-[var(--background)] px-2 py-1 text-[11px] font-black uppercase">
+            <span className="card-inset inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium">
               <span
-                className={`h-2.5 w-2.5 rounded-full ${connectionColorByState[connectionState]}`}
+                className={`h-2 w-2 rounded-full ${connectionColorByState[connectionState]}`}
               />
               ws {connectionState}
             </span>
-            <span className="neo-panel bg-[var(--background)] px-2 py-1 text-[11px] font-black uppercase">
+            <span className="card-inset rounded-md px-2 py-1 text-[11px] font-medium">
               buffered {bufferedCount}
             </span>
             <Button
@@ -1073,7 +1071,7 @@ export function MainCanvasShell({
         {showConnectionError ? (
           <div
             role="alert"
-            className="neo-panel relative z-10 mt-3 bg-red-500/20 px-3 py-2 text-xs font-black uppercase tracking-wide"
+            className="relative z-10 mt-3 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-600 dark:border-red-500/30 dark:text-red-400"
           >
             Backend disconnected. Start server and infrastructure to resume live
             simulation.
@@ -1093,7 +1091,7 @@ export function MainCanvasShell({
         ) : null}
 
         {showLoadingState ? (
-          <div className="neo-panel skeleton-wave relative z-10 mt-4 h-[460px] bg-[var(--background)]" />
+          <div className="skeleton-wave relative z-10 mt-4 h-[460px] rounded-xl bg-[var(--surface-2)]" />
         ) : (
           <div
             className={`relative z-10 mt-4 ${whatIfEnabled ? "what-if-failure" : ""}`}
@@ -1120,12 +1118,12 @@ export function MainCanvasShell({
 
       <section
         id={sectionIdByTarget.focus}
-        className={`neo-panel relative bg-[var(--surface)] p-3 ${isGuideTarget("focus") ? "guide-highlight" : ""}`}
+        className={`card relative rounded-xl p-3 ${isGuideTarget("focus") ? "guide-highlight" : ""}`}
       >
         {isGuideTarget("focus") ? (
           <span className="guide-badge">LOOK HERE</span>
         ) : null}
-        <h3 className="text-xs font-black uppercase tracking-wide">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Focus Steps
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -1160,8 +1158,8 @@ export function MainCanvasShell({
       </section>
 
       {focusPanel === "flow" ? (
-        <section className="neo-panel bg-[var(--surface)] p-3">
-          <h3 className="text-xs font-black uppercase tracking-wide">
+        <section className="card rounded-xl p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Tracking Checklist
           </h3>
           <ul className="mt-2 space-y-2">
@@ -1176,15 +1174,15 @@ export function MainCanvasShell({
               return (
                 <li
                   key={phase.id}
-                  className="neo-panel flex items-start justify-between gap-2 bg-[var(--background)] px-3 py-2"
+                  className="card-inset flex items-start justify-between gap-2 rounded-md px-3 py-2"
                 >
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wide">
+                    <p className="text-xs font-semibold">
                       Phase {phase.id}: {phase.title}
                     </p>
                     <p className="mt-1 text-xs">{phase.description}</p>
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-wide">
+                  <span className="shrink-0 text-[11px] font-medium text-[var(--muted)]">
                     {status}
                   </span>
                 </li>
@@ -1203,7 +1201,7 @@ export function MainCanvasShell({
             <span className="guide-badge">LOOK HERE</span>
           ) : null}
           {showLoadingState ? (
-            <section className="neo-panel skeleton-wave h-28 bg-[var(--surface)]" />
+            <section className="skeleton-wave h-28 rounded-xl bg-[var(--surface-2)]" />
           ) : (
             <ActivityBar metrics={metrics} events={throttledFlowEvents} />
           )}
@@ -1224,11 +1222,11 @@ export function MainCanvasShell({
 
       {currentGuideStep ? (
         <div className="pointer-events-none fixed inset-0 z-50 bg-black/20">
-          <aside className="neo-panel pointer-events-auto absolute bottom-4 right-4 z-50 w-[min(92vw,26rem)] bg-[var(--surface)] p-4">
-            <p className="text-[11px] font-black uppercase tracking-wide">
+          <aside className="card pointer-events-auto absolute bottom-4 right-4 z-50 w-[min(92vw,26rem)] rounded-2xl p-4 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Tutorial Quest {guideIndex + 1}/{guideSteps.length}
             </p>
-            <h3 className="mt-1 text-base font-black tracking-tight">
+            <h3 className="mt-1 text-base font-semibold tracking-tight">
               {currentGuideStep.title}
             </h3>
             <p className="mt-1 text-sm leading-relaxed">

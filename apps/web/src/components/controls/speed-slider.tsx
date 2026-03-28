@@ -10,8 +10,8 @@ export function SpeedSlider() {
   const currentIndex = playbackRates.findIndex((rate) => rate === playbackRate);
 
   return (
-    <div className="neo-panel flex min-h-11 items-center gap-2 bg-[var(--background)] p-2">
-      <label className="text-[11px] font-black uppercase tracking-wide">
+    <div className="flex items-center gap-2">
+      <label className="hidden text-xs font-medium text-[var(--muted)] md:block">
         Speed
       </label>
 
@@ -28,21 +28,20 @@ export function SpeedSlider() {
             setPlaybackRate(nextRate);
           }
         }}
-        className="h-2 w-28 accent-[var(--main)] md:w-36"
+        className="hidden h-1.5 w-20 accent-[var(--main)] md:block md:w-28"
         aria-label="Playback speed"
       />
 
-      <span className="min-w-10 text-center text-xs font-black">
+      <span className="hidden min-w-8 text-center text-xs font-semibold md:block">
         {playbackRate}x
       </span>
 
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon"
         onClick={togglePaused}
         aria-label={paused ? "Resume" : "Pause"}
-        className="h-10 w-10 p-0"
       >
         {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
       </Button>
@@ -50,11 +49,10 @@ export function SpeedSlider() {
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon"
         disabled={!paused}
         onClick={stepForward}
         aria-label="Step one event"
-        className="h-10 w-10 p-0"
       >
         <SkipForward className="h-4 w-4" />
       </Button>

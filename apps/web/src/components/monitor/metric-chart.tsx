@@ -21,12 +21,12 @@ export function MetricChart({
         >
           <Tooltip
             contentStyle={{
-              border: "2px solid var(--border)",
-              borderRadius: "0",
-              boxShadow: "var(--shadow)",
-              background: "var(--background)",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              boxShadow: "var(--shadow-sm)",
+              background: "var(--surface)",
               fontSize: "11px",
-              fontWeight: "700",
+              fontWeight: "600",
             }}
             labelStyle={{ display: "none" }}
           />

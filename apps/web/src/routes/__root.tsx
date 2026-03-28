@@ -38,9 +38,9 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         <SimulationUiProvider>
-          <div className="min-h-dvh pb-6">
+          <div className="min-h-dvh">
             <TopNav />
-            <main className="mx-3 mt-3 grid gap-3 md:mx-6 md:grid-cols-[300px,1fr]">
+            <main className="grid gap-4 p-4 md:gap-6 md:p-6 md:grid-cols-[280px,1fr]">
               <Sidebar />
               <section>{children}</section>
             </main>

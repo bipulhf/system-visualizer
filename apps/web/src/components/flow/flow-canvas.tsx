@@ -33,7 +33,7 @@ export function FlowCanvas({
   edges: Edge<AnimatedEdgeData, "animatedEdge">[];
 }) {
   return (
-    <div className="neo-panel h-[460px] overflow-hidden bg-[var(--background)]">
+    <div className="h-[460px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
       <ReactFlow<
         Node<ServiceNodeData, "serviceNode">,
         Edge<AnimatedEdgeData, "animatedEdge">

@@ -4,10 +4,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --border: oklch(0% 0 0);
-  --box-shadow-x: 4px;
-  --box-shadow-y: 4px;
-  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0 0 var(--border);
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --border: oklch(88% 0.01 90);
+  --border-strong: oklch(76% 0.01 90);
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+
+  --background: oklch(97% 0.005 90);
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(96% 0.007 90);
+  --foreground: oklch(15% 0.01 260);
+  --muted: oklch(55% 0.01 90);
 
   --main: oklch(67.47% 0.1725 259.61);
   --redis: oklch(62% 0.25 29);
@@ -15,23 +30,23 @@
   --rabbitmq: oklch(65% 0.2 145);
   --kafka: oklch(55% 0.15 300);
   --postgres: oklch(60% 0.15 230);
-
-  --background: oklch(96% 0.01 90);
-  --surface: oklch(99% 0.01 90);
-  --foreground: oklch(0% 0 0);
 }
 
 .dark {
+  --border: oklch(30% 0.02 260);
+  --border-strong: oklch(40% 0.02 260);
+  --background: oklch(11% 0.015 260);
+  --surface: oklch(17% 0.02 260);
+  --surface-2: oklch(22% 0.025 260);
+  --foreground: oklch(96% 0.005 90);
+  --muted: oklch(62% 0.01 260);
+
   --main: oklch(76% 0.15 255);
   --redis: oklch(69% 0.21 29);
   --bullmq: oklch(81% 0.14 90);
   --rabbitmq: oklch(74% 0.16 145);
   --kafka: oklch(75% 0.12 295);
   --postgres: oklch(75% 0.11 235);
-
-  --background: oklch(20% 0.02 260);
-  --surface: oklch(25% 0.03 260);
-  --foreground: oklch(98% 0.01 95);
 }
 
 @theme {
@@ -42,7 +57,6 @@
 @layer base {
   * {
     box-sizing: border-box;
-    border-color: var(--border);
   }
 
   html,
@@ -55,12 +69,12 @@
     background:
       radial-gradient(
         circle at 12% 22%,
-        color-mix(in oklch, var(--main) 18%, transparent) 0,
+        color-mix(in oklch, var(--main) 10%, transparent) 0,
         transparent 34%
       ),
       radial-gradient(
         circle at 88% 78%,
-        color-mix(in oklch, var(--redis) 20%, transparent) 0,
+        color-mix(in oklch, var(--redis) 8%, transparent) 0,
         transparent 30%
       ),
       var(--background);
@@ -78,17 +92,17 @@
   }
 }
 
-@utility neo-panel {
-  border: 2px solid var(--border);
-  box-shadow: var(--shadow);
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
-@utility neo-press {
-  transform: translate(
-    calc(-1 * var(--box-shadow-x)),
-    calc(-1 * var(--box-shadow-y))
-  );
-  box-shadow: none;
+@utility card-inset {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 @keyframes phase2-shake {
@@ -107,7 +121,7 @@
 @keyframes scenario-enter {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -129,18 +143,18 @@
   100% {
     box-shadow:
       0 0 0 0 color-mix(in oklch, var(--main) 44%, transparent),
-      var(--shadow);
+      var(--shadow-sm);
   }
   50% {
     box-shadow:
       0 0 0 8px color-mix(in oklch, var(--main) 15%, transparent),
-      var(--shadow);
+      var(--shadow-sm);
   }
 }
 
 @utility what-if-failure {
-  border-color: oklch(60% 0.25 25);
-  animation: phase2-shake 0.42s ease-in-out infinite;
+  box-shadow: 0 0 0 2px oklch(62% 0.25 25);
+  animation: phase2-shake 0.42s ease-in-out 3;
 }
 
 @utility scenario-shell-enter {
@@ -160,7 +174,7 @@
 
 @layer components {
   .guide-highlight {
-    border-color: color-mix(in oklch, var(--main) 75%, black 25%);
+    border-color: color-mix(in oklch, var(--main) 65%, transparent 35%) !important;
     animation: guide-pulse 1.15s ease-in-out infinite;
   }
 
@@ -169,21 +183,37 @@
     top: -13px;
     left: 10px;
     display: inline-flex;
-    border: 2px solid var(--border);
-    background: var(--bullmq);
+    border: 1px solid var(--border);
+    background: var(--main);
+    color: white;
     padding: 2px 8px;
     font-size: 10px;
-    font-weight: 900;
-    letter-spacing: 0.08em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius-xs);
+    box-shadow: var(--shadow-sm);
     z-index: 30;
+  }
+
+  .card-interactive {
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+
+  .card-interactive:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .card-interactive:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-xs);
   }
 }
 
 @layer base {
   :focus-visible {
-    outline: 3px solid color-mix(in oklch, var(--main) 78%, black 22%);
+    outline: 2px solid color-mix(in oklch, var(--main) 78%, black 22%);
     outline-offset: 2px;
   }
 }

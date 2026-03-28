@@ -4,6 +4,7 @@ import {
   type SupportedScenarioId,
 } from "~/lib/learning-content";
 import { useSimulationUi } from "~/lib/simulation-ui-context";
+import { cn } from "~/lib/utils";
 
 const serviceOrder: ServiceName[] = [
   "elysia",
@@ -27,7 +28,7 @@ export function WhyTooltip({
 
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-bold uppercase tracking-wider">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
         Why This Tech?
       </h3>
       <div className="flex flex-wrap gap-1">
@@ -39,22 +40,32 @@ export function WhyTooltip({
             onClick={() => {
               setSelectedService(service);
             }}
-            className={`neo-panel px-2 py-1 text-[11px] font-bold uppercase ${service === activeService ? "bg-[var(--main)] text-[var(--background)]" : "bg-[var(--surface)]"}`}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+              service === activeService
+                ? "bg-[var(--main)] text-white"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)]",
+            )}
           >
             {service}
           </button>
         ))}
       </div>
-      <article className="neo-panel bg-[var(--surface)] p-3">
-        <p className="text-sm font-black">{content.title}</p>
-        <p className="mt-1 text-xs leading-relaxed">{content.reason}</p>
-        <p className="mt-2 text-xs font-semibold opacity-90">
-          Instead of naive approach: {content.comparison}
+      <div className="card-inset rounded-lg p-3">
+        <p className="text-sm font-semibold">{content.title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+          {content.reason}
         </p>
-        <p className="mt-2 text-[11px] font-black uppercase tracking-wide">
-          Key Metric: {content.keyMetric}
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          <span className="font-medium text-[var(--foreground)]">
+            vs naive approach:
+          </span>{" "}
+          {content.comparison}
         </p>
-      </article>
+        <p className="mt-2 text-xs font-semibold">
+          Key metric: {content.keyMetric}
+        </p>
+      </div>
     </section>
   );
 }

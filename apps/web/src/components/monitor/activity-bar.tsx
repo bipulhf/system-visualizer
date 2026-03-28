@@ -66,11 +66,11 @@ export function ActivityBar({
   }, [events]);
 
   return (
-    <section className="neo-panel bg-[var(--surface)] p-3">
-      <h3 className="text-xs font-bold uppercase tracking-wider">
+    <section className="card rounded-xl p-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
         Activity Monitor
       </h3>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric) => (
           <ServiceCard
             key={metric.service}

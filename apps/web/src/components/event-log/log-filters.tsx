@@ -5,6 +5,7 @@ import {
   type EventKind,
   type ServiceName,
 } from "~/lib/event-types";
+import { cn } from "~/lib/utils";
 
 export function LogFilters({
   activeServices,
@@ -22,9 +23,7 @@ export function LogFilters({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-black uppercase tracking-wide">
-          Filters
-        </p>
+        <p className="text-xs font-semibold text-[var(--muted)]">Filters</p>
         <Button size="sm" variant="ghost" type="button" onClick={reset}>
           Reset
         </Button>
@@ -42,7 +41,12 @@ export function LogFilters({
               onClick={() => {
                 toggleService(service);
               }}
-              className={`neo-panel px-2 py-1 text-[11px] font-bold uppercase ${active ? "bg-[var(--main)] text-[var(--background)]" : "bg-[var(--background)]"}`}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                active
+                  ? "bg-[var(--main)] text-white"
+                  : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]",
+              )}
             >
               {service}
             </button>
@@ -63,7 +67,12 @@ export function LogFilters({
                 onClick={() => {
                   toggleKind(kind);
                 }}
-                className={`neo-panel px-2 py-1 text-[10px] font-bold ${active ? "bg-[var(--foreground)] text-[var(--background)]" : "bg-[var(--background)]"}`}
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                  active
+                    ? "bg-[var(--foreground)] text-[var(--surface)]"
+                    : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]",
+                )}
               >
                 {kind}
               </button>

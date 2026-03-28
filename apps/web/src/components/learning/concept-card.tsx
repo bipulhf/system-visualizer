@@ -35,27 +35,29 @@ export function ConceptCard({
       animate={{ opacity: 1, y: 0, x: 0 }}
       exit={{ opacity: 0, y: 12, x: 12 }}
       transition={{ duration: 0.24, ease: "easeOut" }}
-      className="neo-panel pointer-events-auto w-full max-w-sm bg-[var(--surface)] p-3"
+      className="card pointer-events-auto w-full max-w-sm rounded-xl p-3 shadow-lg"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-wide">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Concept Card
           </p>
-          <h4 className="text-sm font-black">{concept.title}</h4>
+          <h4 className="text-sm font-semibold">{concept.title}</h4>
         </div>
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0"
+          size="icon"
+          className="h-7 w-7"
           onClick={onDismiss}
           aria-label="Dismiss concept card"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <p className="mt-2 text-xs leading-relaxed">{concept.description}</p>
+      <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
+        {concept.description}
+      </p>
     </motion.article>
   );
 }

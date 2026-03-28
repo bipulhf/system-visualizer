@@ -4,17 +4,24 @@ import * as React from "react";
 import { cn } from "~/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap border-2 border-[var(--border)] text-sm font-semibold transition-transform duration-150 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border)]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--main)] text-[var(--foreground)] shadow-[var(--shadow)] hover:-translate-x-[var(--box-shadow-x)] hover:-translate-y-[var(--box-shadow-y)] hover:shadow-none",
-        ghost: "bg-transparent text-[var(--foreground)] hover:bg-black/5",
+          "bg-[var(--main)] text-white shadow-sm hover:brightness-110 active:scale-[0.97]",
+        secondary:
+          "border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] shadow-xs hover:bg-[var(--surface-2)] active:scale-[0.97]",
+        ghost:
+          "text-[var(--foreground)] hover:bg-[var(--surface-2)] active:scale-[0.97]",
+        destructive:
+          "bg-red-500 text-white shadow-sm hover:bg-red-600 active:scale-[0.97]",
       },
       size: {
-        default: "h-10 px-4",
-        sm: "h-9 px-3 text-xs",
+        default: "h-9 px-4",
+        sm: "h-7 px-3 text-xs",
+        lg: "h-11 px-6",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {

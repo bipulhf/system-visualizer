@@ -1,4 +1,5 @@
 import type { SimulationEvent, ServiceName } from "~/lib/event-types";
+import { cn } from "~/lib/utils";
 
 const serviceColorVarByName: Record<ServiceName, string> = {
   elysia: "--main",
@@ -29,8 +30,13 @@ export function EventEntry({
 }) {
   return (
     <li
-      className={`neo-panel h-[92px] bg-[var(--background)] px-2 py-1 ${selected ? "bg-[var(--surface)]" : ""}`}
-      style={{ borderColor: `var(${serviceColorVarByName[event.source]})` }}
+      className={cn(
+        "h-[92px] overflow-hidden rounded-md border-l-2 px-2 py-1.5 transition-colors",
+        selected ? "bg-[var(--surface-2)]" : "hover:bg-[var(--surface-2)]",
+      )}
+      style={{
+        borderLeftColor: `var(${serviceColorVarByName[event.source]})`,
+      }}
     >
       <button
         type="button"
@@ -41,15 +47,21 @@ export function EventEntry({
         aria-expanded={selected}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-black">
+          <span className="tabular-nums text-[11px] font-medium text-[var(--muted)]">
             {formatTimestamp(event.timestamp)}
           </span>
-          <span className="text-[11px] font-bold uppercase">
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{
+              background: `color-mix(in oklch, var(${serviceColorVarByName[event.source]}) 15%, transparent)`,
+              color: `var(${serviceColorVarByName[event.source]})`,
+            }}
+          >
             {event.source}
           </span>
         </div>
-        <p className="mt-0.5 text-xs font-black">{event.kind}</p>
-        <p className="line-clamp-2 text-xs font-semibold opacity-85">
+        <p className="mt-0.5 text-xs font-semibold">{event.kind}</p>
+        <p className="line-clamp-2 text-xs text-[var(--muted)]">
           {event.description}
         </p>
       </button>

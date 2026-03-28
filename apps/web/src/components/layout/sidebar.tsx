@@ -14,48 +14,57 @@ export function Sidebar() {
 
   if (!pathname.startsWith("/scenarios/")) {
     return (
-      <aside className="neo-panel flex h-full flex-col gap-4 bg-[var(--background)] p-4">
-        <section className="space-y-2">
-          <h2 className="text-lg font-black tracking-tight">
-            Learning Navigation
-          </h2>
-          <p className="text-sm leading-relaxed">
+      <aside className="flex h-full flex-col gap-4 border-r border-[var(--border)] bg-[var(--surface)] p-4">
+        <section className="space-y-1.5">
+          <h2 className="text-sm font-semibold">Learning Navigation</h2>
+          <p className="text-xs leading-relaxed text-[var(--muted)]">
             Start a simulation track or browse the glossary before jumping to a
             live phase.
           </p>
         </section>
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           <Link
             to="/"
-            className="neo-panel block bg-[var(--surface)] px-3 py-2 text-xs font-black uppercase tracking-wide"
+            className="block rounded-md px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
           >
             Landing Page
           </Link>
           <Link
             to="/learn"
-            className="neo-panel block bg-[var(--surface)] px-3 py-2 text-xs font-black uppercase tracking-wide"
+            className="block rounded-md px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
           >
             Learn Section
           </Link>
           <Link
             to="/scenarios/flash-sale"
-            className="neo-panel block bg-[var(--main)] px-3 py-2 text-xs font-black uppercase tracking-wide"
+            className="block rounded-md bg-[var(--main)] px-3 py-2 text-sm font-semibold text-white transition-colors hover:brightness-110"
           >
             Enter Simulation
           </Link>
         </div>
 
-        <section className="neo-panel bg-[var(--surface)] p-3">
-          <h3 className="text-xs font-black uppercase tracking-wide">
+        <div className="card-inset rounded-lg p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Keyboard Shortcuts
           </h3>
-          <ul className="mt-2 space-y-1 text-xs font-semibold">
-            <li>Space: Pause or resume simulation playback</li>
-            <li>Arrow Left/Right: Step one event when paused</li>
-            <li>Keys 1-4: Set speed preset</li>
+          <ul className="mt-2 space-y-1.5 text-xs text-[var(--muted)]">
+            <li>
+              <span className="font-medium text-[var(--foreground)]">
+                Space
+              </span>{" "}
+              — pause or resume
+            </li>
+            <li>
+              <span className="font-medium text-[var(--foreground)]">← →</span>{" "}
+              — step when paused
+            </li>
+            <li>
+              <span className="font-medium text-[var(--foreground)]">1–4</span>{" "}
+              — set speed preset
+            </li>
           </ul>
-        </section>
+        </div>
       </aside>
     );
   }
@@ -64,21 +73,23 @@ export function Sidebar() {
   const info = scenarioInfoById[scenarioId];
 
   return (
-    <aside className="neo-panel flex h-full flex-col gap-4 bg-[var(--background)] p-4">
-      <section className="space-y-2">
-        <h2 className="text-lg font-black tracking-tight">{info.title}</h2>
-        <p className="text-sm leading-relaxed">{info.tagline}</p>
+    <aside className="flex h-full flex-col gap-4 border-r border-[var(--border)] bg-[var(--surface)] p-4">
+      <section className="space-y-1.5">
+        <h2 className="text-sm font-semibold">{info.title}</h2>
+        <p className="text-xs leading-relaxed text-[var(--muted)]">
+          {info.tagline}
+        </p>
       </section>
 
-      <section className="neo-panel bg-white/70 p-3 dark:bg-black/30">
-        <h3 className="text-xs font-bold uppercase tracking-wider">
+      <div className="card-inset rounded-lg p-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           The Problem
         </h3>
-        <p className="mt-2 text-sm">{info.problem}</p>
-      </section>
+        <p className="mt-1.5 text-xs leading-relaxed">{info.problem}</p>
+      </div>
 
       <section className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           Learning Panel
         </h3>
         <div className="space-y-4">

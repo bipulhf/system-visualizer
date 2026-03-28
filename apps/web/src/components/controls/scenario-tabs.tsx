@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 
 const scenarioTabs = [
   { label: "Flash Sale", to: "/scenarios/flash-sale", enabled: true },
@@ -14,34 +14,37 @@ export function ScenarioTabs() {
   });
 
   return (
-    <nav className="flex flex-wrap gap-2" aria-label="Scenario tabs">
+    <nav
+      className="flex items-center gap-0.5 overflow-x-auto rounded-lg bg-[var(--surface-2)] p-1"
+      aria-label="Scenario tabs"
+    >
       {scenarioTabs.map((tab) => {
         const isActive = pathname.startsWith(tab.to);
 
         if (!tab.enabled) {
           return (
-            <Button
+            <span
               key={tab.label}
-              variant={isActive ? "default" : "ghost"}
-              size="sm"
-              type="button"
-              disabled
+              className="cursor-not-allowed rounded-md px-3 py-1.5 text-xs font-medium text-[var(--muted)] opacity-40"
             >
               {tab.label}
-            </Button>
+            </span>
           );
         }
 
         return (
-          <Button
+          <Link
             key={tab.label}
-            variant={isActive ? "default" : "ghost"}
-            size="sm"
-            type="button"
-            asChild
+            to={tab.to}
+            className={cn(
+              "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              isActive
+                ? "bg-[var(--surface)] text-[var(--foreground)] shadow-xs"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]",
+            )}
           >
-            <Link to={tab.to}>{tab.label}</Link>
-          </Button>
+            {tab.label}
+          </Link>
         );
       })}
     </nav>
