@@ -1,11 +1,13 @@
 import { Elysia } from "elysia";
 import { onSimulationEvent } from "./events/emitter";
 import {
-  isPhaseOneHarnessRunning,
-  setPhaseOneHarnessPhase,
-  startPhaseOneHarness,
-  stopPhaseOneHarness,
-} from "./scenarios/phase1-harness";
+  getFlashSaleStatus,
+  isFlashSaleScenarioRunning,
+  setFlashSaleRequestTarget,
+  setFlashSaleScenarioPhase,
+  startFlashSaleScenario,
+  stopFlashSaleScenario,
+} from "./scenarios/flash-sale";
 import {
   checkBullMqConnection,
   closeBullMqConnection,
@@ -83,6 +85,7 @@ let simulationClientCount = 0;
 type SimulationCommand = {
   command?: string;
   phase?: number;
+  requestTarget?: number;
 };
 
 const app = new Elysia()
@@ -91,9 +94,13 @@ const app = new Elysia()
     return result;
   })
   .get("/simulation/harness", () => {
+    const status = getFlashSaleStatus();
+
     return {
-      running: isPhaseOneHarnessRunning(),
+      running: isFlashSaleScenarioRunning(),
       connectedClients: simulationClientCount,
+      scenario: "flash-sale",
+      status,
     };
   })
   .ws("/ws/simulation", {
@@ -101,8 +108,8 @@ const app = new Elysia()
       ws.subscribe("simulation");
       simulationClientCount += 1;
 
-      if (!isPhaseOneHarnessRunning()) {
-        void startPhaseOneHarness();
+      if (!isFlashSaleScenarioRunning()) {
+        void startFlashSaleScenario();
       }
     },
     close(ws) {
@@ -110,7 +117,7 @@ const app = new Elysia()
       simulationClientCount = Math.max(0, simulationClientCount - 1);
 
       if (simulationClientCount === 0) {
-        void stopPhaseOneHarness();
+        void stopFlashSaleScenario();
       }
     },
     message(_, message) {
@@ -120,24 +127,31 @@ const app = new Elysia()
 
       try {
         const command = JSON.parse(message) as SimulationCommand;
-        if (command.command !== "jump_phase") {
+        if (command.command === "jump_phase") {
+          if (typeof command.phase !== "number") {
+            return;
+          }
+
+          const phase = Math.trunc(command.phase);
+          if (phase < 1 || phase > 4) {
+            return;
+          }
+
+          if (!isFlashSaleScenarioRunning()) {
+            void startFlashSaleScenario();
+          }
+
+          setFlashSaleScenarioPhase(phase);
           return;
         }
 
-        if (typeof command.phase !== "number") {
-          return;
-        }
+        if (command.command === "set_request_target") {
+          if (typeof command.requestTarget !== "number") {
+            return;
+          }
 
-        const phase = Math.trunc(command.phase);
-        if (phase < 1 || phase > 4) {
-          return;
+          setFlashSaleRequestTarget(command.requestTarget);
         }
-
-        if (!isPhaseOneHarnessRunning()) {
-          void startPhaseOneHarness();
-        }
-
-        setPhaseOneHarnessPhase(phase);
       } catch {
         return;
       }
@@ -155,7 +169,7 @@ log("info", "Elysia server started", {
 
 const shutdown = async (): Promise<void> => {
   unsubscribeFromSimulationBus();
-  await stopPhaseOneHarness();
+  await stopFlashSaleScenario();
 
   await Promise.allSettled([
     closeBullMqConnection(),

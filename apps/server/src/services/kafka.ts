@@ -5,16 +5,34 @@ import { env } from "./env";
 
 const kafka = new Kafka({
   brokers: env.kafkaBrokers,
-  clientId: "visualizer-phase1-simulation",
+  clientId: "visualizer-flash-sale-simulation",
 });
 
-const topicName = "visualizer-phase1-events";
+const defaultTopicName = "flash-sale-events";
 
 const producer = kafka.producer();
-const consumer = kafka.consumer({ groupId: "visualizer-phase1-group" });
+
+const consumerConfigs = [
+  { groupId: "flash-sale-analytics", delayMs: 35 },
+  { groupId: "flash-sale-notifications", delayMs: 95 },
+  { groupId: "flash-sale-fraud", delayMs: 180 },
+] as const;
+
+type ConsumerRuntime = {
+  consumer: ReturnType<Kafka["consumer"]>;
+  connected: boolean;
+  groupId: string;
+  delayMs: number;
+};
+
+const consumerRuntimes: ConsumerRuntime[] = consumerConfigs.map((config) => ({
+  consumer: kafka.consumer({ groupId: config.groupId }),
+  connected: false,
+  groupId: config.groupId,
+  delayMs: config.delayMs,
+}));
 
 let producerConnected = false;
-let consumerConnected = false;
 let topicEnsured = false;
 
 type KafkaPayload = {
@@ -47,7 +65,13 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
     try {
       await admin.createTopics({
         waitForLeaders: true,
-        topics: [{ topic: topicName, numPartitions: 1, replicationFactor: 1 }],
+        topics: [
+          {
+            topic: defaultTopicName,
+            numPartitions: 3,
+            replicationFactor: 1,
+          },
+        ],
       });
       topicEnsured = true;
     } finally {
@@ -60,12 +84,23 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
     producerConnected = true;
   }
 
-  if (!consumerConnected) {
-    await consumer.connect();
-    await consumer.subscribe({ topic: topicName, fromBeginning: false });
+  for (const runtime of consumerRuntimes) {
+    if (runtime.connected) {
+      continue;
+    }
 
-    await consumer.run({
+    await runtime.consumer.connect();
+    await runtime.consumer.subscribe({
+      topic: defaultTopicName,
+      fromBeginning: false,
+    });
+
+    await runtime.consumer.run({
       eachMessage: async ({ message }) => {
+        if (runtime.delayMs > 0) {
+          await Bun.sleep(runtime.delayMs);
+        }
+
         const rawValue = message.value ? message.value.toString() : "";
         const payload = parseKafkaPayload(rawValue);
 
@@ -77,16 +112,17 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
           target: "postgres",
           data: {
             requestId: payload.requestId,
-            topic: topicName,
+            topic: defaultTopicName,
             detail: payload.detail,
+            consumerGroup: runtime.groupId,
           },
-          latencyMs: 0,
-          description: `Kafka consumed ${payload.requestId}`,
+          latencyMs: runtime.delayMs,
+          description: `Kafka ${runtime.groupId} consumed ${payload.requestId}`,
         });
       },
     });
 
-    consumerConnected = true;
+    runtime.connected = true;
   }
 }
 
@@ -97,6 +133,7 @@ export async function checkKafkaConnection(): Promise<void> {
 export async function produceKafkaEvent(
   context: SimulationContext,
   detail: string,
+  topic: string = defaultTopicName,
 ): Promise<void> {
   const startedAt = performance.now();
   await ensureKafkaRuntimeConnections();
@@ -109,7 +146,7 @@ export async function produceKafkaEvent(
   };
 
   await producer.send({
-    topic: topicName,
+    topic,
     messages: [
       { key: context.requestId, value: serializeKafkaPayload(payload) },
     ],
@@ -123,7 +160,7 @@ export async function produceKafkaEvent(
     target: "postgres",
     data: {
       requestId: context.requestId,
-      topic: topicName,
+      topic,
       detail,
     },
     latencyMs: Math.round(performance.now() - startedAt),
@@ -132,13 +169,19 @@ export async function produceKafkaEvent(
 }
 
 export async function closeKafkaConnection(): Promise<void> {
-  if (consumerConnected) {
-    await consumer.disconnect();
-    consumerConnected = false;
+  for (const runtime of consumerRuntimes) {
+    if (!runtime.connected) {
+      continue;
+    }
+
+    await runtime.consumer.disconnect();
+    runtime.connected = false;
   }
 
   if (producerConnected) {
     await producer.disconnect();
     producerConnected = false;
   }
+
+  topicEnsured = false;
 }

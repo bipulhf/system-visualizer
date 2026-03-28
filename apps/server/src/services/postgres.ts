@@ -4,15 +4,37 @@ import type { SimulationContext } from "../events/types";
 import { env } from "./env";
 
 const sql = postgres(env.postgresUrl, { max: 1 });
+let flashSaleTableEnsured = false;
+
+async function ensureFlashSaleTable(): Promise<void> {
+  if (flashSaleTableEnsured) {
+    return;
+  }
+
+  await sql`
+    create table if not exists flash_sale_orders (
+      request_id text primary key,
+      scenario text not null,
+      order_status text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `;
+
+  flashSaleTableEnsured = true;
+}
 
 export async function checkPostgresConnection(): Promise<void> {
   await sql`select 1`;
+  await ensureFlashSaleTable();
 }
 
 export async function runPostgresTransaction(
   context: SimulationContext,
+  orderStatus: "confirmed" | "failed" = "confirmed",
 ): Promise<void> {
   const transactionStartedAt = performance.now();
+  await ensureFlashSaleTable();
 
   emitSimulationEvent({
     scenario: context.scenario,
@@ -30,7 +52,14 @@ export async function runPostgresTransaction(
 
   try {
     const queryStartedAt = performance.now();
-    await sql`select ${context.requestId}::text as request_id`;
+    await sql`
+      insert into flash_sale_orders (request_id, scenario, order_status)
+      values (${context.requestId}, ${context.scenario}, ${orderStatus})
+      on conflict (request_id)
+      do update set
+        order_status = excluded.order_status,
+        updated_at = now()
+    `;
 
     emitSimulationEvent({
       scenario: context.scenario,
@@ -39,7 +68,8 @@ export async function runPostgresTransaction(
       source: "postgres",
       data: {
         requestId: context.requestId,
-        query: "select_request_id",
+        query: "upsert_flash_sale_order",
+        orderStatus,
       },
       latencyMs: Math.round(performance.now() - queryStartedAt),
       description: `Postgres query for ${context.requestId}`,

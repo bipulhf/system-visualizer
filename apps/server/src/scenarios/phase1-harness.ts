@@ -90,7 +90,12 @@ async function runLoopTick(): Promise<void> {
     );
     const shouldFail = currentSequence % 7 === 0;
 
-    await enqueueBullMqJob(context, shouldFail);
+    await enqueueBullMqJob(context, {
+      shouldFail,
+      priority: 1,
+      attempts: 1,
+      backoffDelayMs: 100,
+    });
     await publishRabbitMqMessage(context, `order:${context.requestId}`);
     await produceKafkaEvent(context, `stock_after_decr:${stockAfterDecrement}`);
     await runPostgresTransaction(context);

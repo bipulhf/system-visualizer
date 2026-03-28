@@ -479,54 +479,56 @@ interface SimulationEvent {
 
 **Goal:** First complete end-to-end scenario fully working.
 
+**Status:** Completed
+
 #### Backend Simulation (`scenarios/flash-sale.ts`)
 
-- [ ] Phase 1 — The Spike:
+- [x] Phase 1 — The Spike:
   - Simulate 10,000 requests hitting Elysia (configurable count)
   - Redis `DECR stock:item_42` — 100 succeed, rest rejected
   - Redis sliding window rate limiter
   - Emit events: `request.received`, `redis.op` (DECR), `request.rejected`
 
-- [ ] Phase 2 — Job Queuing:
+- [x] Phase 2 — Job Queuing:
   - BullMQ queue with 100 prioritized jobs
   - Worker processes: payment → reserve_inventory → confirm
   - Failed payments retry 3x with exponential backoff
   - On final failure: release stock back via Redis INCR
   - Emit events: `bullmq.job.created`, `bullmq.job.processing`, `bullmq.job.completed`, `bullmq.job.failed`
 
-- [ ] Phase 3 — Fan-Out:
+- [x] Phase 3 — Fan-Out:
   - RabbitMQ fanout exchange → 4 queues (email, invoice, warehouse, fraud)
   - Each consumer processes and ACKs
   - Emit events: `rabbitmq.published`, `rabbitmq.routed`, `rabbitmq.consumed`, `rabbitmq.ack`
 
-- [ ] Phase 4 — Audit Trail:
+- [x] Phase 4 — Audit Trail:
   - Kafka producer sends all 10k events to `flash-sale-events` topic
   - 3 consumer groups read at different speeds
   - Emit events: `kafka.produced`, `kafka.consumed`
 
-- [ ] PostgreSQL final write on successful orders
+- [x] PostgreSQL final write on successful orders
   - Emit events: `postgres.tx.begin`, `postgres.query`, `postgres.tx.commit`
 
 #### Frontend Integration
 
-- [ ] Wire flash-sale route to simulation hook
-- [ ] Configure @xyflow graph layout for this scenario's architecture
-- [ ] Map all event kinds to node/edge animations
-- [ ] Write all learning content for flash sale:
+- [x] Wire flash-sale route to simulation hook
+- [x] Configure @xyflow graph layout for this scenario's architecture
+- [x] Map all event kinds to node/edge animations
+- [x] Write all learning content for flash sale:
   - Why Redis for atomic stock counting (vs DB locks)
   - Why BullMQ for retry logic (vs manual retries)
   - Why RabbitMQ fan-out (vs sequential calls)
   - Why Kafka for audit (vs writing to DB)
   - "What if?" content for each service removal
-- [ ] Phase stepper configured with 4 phases
-- [ ] Concept cards triggered: "Atomic Operation", "Thundering Herd", "Fan-Out Pattern", "Dead Letter Queue", "Event Sourcing"
+- [x] Phase stepper configured with 4 phases
+- [x] Concept cards triggered: "Atomic Operation", "Thundering Herd", "Fan-Out Pattern", "Dead Letter Queue", "Event Sourcing"
 
 #### Testing & Polish
 
-- [ ] End-to-end run: start simulation, watch all 4 phases animate
-- [ ] Verify event log shows correct flow
-- [ ] Verify activity monitor shows real metrics
-- [ ] Tune animation timing for clarity at 1x speed
+- [x] End-to-end run: start simulation, watch all 4 phases animate
+- [x] Verify event log shows correct flow
+- [x] Verify activity monitor shows real metrics
+- [x] Tune animation timing for clarity at 1x speed
 
 **Deliverable:** Complete working Scenario 1 — user clicks "Start", watches the entire flash sale play out with full learning UI.
 

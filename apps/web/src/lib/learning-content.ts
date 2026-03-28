@@ -69,37 +69,39 @@ export const whyTechByService: Record<ServiceName, WhyTechEntry> = {
     service: "redis",
     title: "Redis for Atomic Stock",
     reason:
-      "Atomic DECR prevents overselling under race conditions without expensive locking.",
+      "Atomic DECR preserves inventory correctness when thousands of buyers hit the same item at once.",
     comparison:
-      "Row-level database locking increases latency and deadlock risk during flash loads.",
-    keyMetric: "Sub-millisecond atomic counter operations",
+      "Database row locks serialize traffic and can deadlock under burst contention.",
+    keyMetric: "Atomic inventory decrement in sub-millisecond latency",
   },
   bullmq: {
     service: "bullmq",
     title: "BullMQ for Reliable Jobs",
     reason:
-      "Queue-backed workers isolate retries and backoff policies from request latency.",
+      "Retrying payment and reservation steps in workers protects API latency and keeps failures recoverable.",
     comparison:
-      "Inline retries block requests and cascade failures across the API tier.",
-    keyMetric: "Controlled retries with durable job state",
+      "Manual retries in request handlers increase timeout rates and duplicate work.",
+    keyMetric: "Three-attempt exponential backoff with durable job state",
   },
   rabbitmq: {
     service: "rabbitmq",
     title: "RabbitMQ for Fan-Out",
     reason:
-      "Publish once and route to many consumers without coupling producers to each consumer.",
+      "One order event fans out to email, invoice, warehouse, and fraud services independently.",
     comparison:
-      "Sequential service calls increase tail latency and create brittle chains.",
-    keyMetric: "Independent downstream consumers with ACK visibility",
+      "Sequential API calls couple all downstream services and amplify failures.",
+    keyMetric:
+      "Single publish, four routed queues with per-queue ACK visibility",
   },
   kafka: {
     service: "kafka",
     title: "Kafka for Event History",
     reason:
-      "Immutable event logs let multiple consumer groups replay and analyze independently.",
+      "Every request outcome is appended once and replayed by analytics, notifications, and fraud groups.",
     comparison:
-      "Direct writes to one store lose replayability and consumer decoupling.",
-    keyMetric: "Durable ordered event stream for multiple readers",
+      "Single-sink writes cannot be replayed for new consumers without backfilling.",
+    keyMetric:
+      "10k immutable request outcomes consumed by three independent groups",
   },
   postgres: {
     service: "postgres",
@@ -113,6 +115,13 @@ export const whyTechByService: Record<ServiceName, WhyTechEntry> = {
 };
 
 export const conceptDefinitions: ConceptDefinition[] = [
+  {
+    id: "thundering-herd",
+    title: "Thundering Herd",
+    description:
+      "A sudden burst of identical requests can overwhelm downstream systems unless admission controls and queues absorb pressure.",
+    triggerKinds: ["request.rejected"],
+  },
   {
     id: "atomic-operation",
     title: "Atomic Operation",

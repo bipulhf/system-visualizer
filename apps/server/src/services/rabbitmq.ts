@@ -8,8 +8,13 @@ import { emitSimulationEvent } from "../events/emitter";
 import type { SimulationContext } from "../events/types";
 import { env } from "./env";
 
-const exchangeName = "visualizer.phase1.fanout";
-const queueName = "visualizer.phase1.consumer";
+const exchangeName = "flash-sale.events.fanout";
+const queueNames = [
+  "flash-sale.email",
+  "flash-sale.invoice",
+  "flash-sale.warehouse",
+  "flash-sale.fraud",
+] as const;
 
 let rabbitConnection: ChannelModel | null = null;
 let rabbitChannel: Channel | null = null;
@@ -24,8 +29,11 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
     await rabbitChannel.assertExchange(exchangeName, "fanout", {
       durable: false,
     });
-    await rabbitChannel.assertQueue(queueName, { durable: false });
-    await rabbitChannel.bindQueue(queueName, exchangeName, "");
+
+    for (const queueName of queueNames) {
+      await rabbitChannel.assertQueue(queueName, { durable: false });
+      await rabbitChannel.bindQueue(queueName, exchangeName, "");
+    }
   }
 
   const channel = rabbitChannel;
@@ -34,47 +42,49 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
   }
 
   if (!consumerInitialized) {
-    await channel.consume(queueName, (message: ConsumeMessage | null) => {
-      if (!message || !rabbitChannel) {
-        return;
-      }
+    for (const queueName of queueNames) {
+      await channel.consume(queueName, (message: ConsumeMessage | null) => {
+        if (!message || !rabbitChannel) {
+          return;
+        }
 
-      const payload = message.content.toString();
-      const chunks = payload.split("|");
-      const scenario = chunks[0] ?? "phase1-harness";
-      const phase = Number(chunks[1] ?? "1");
-      const requestId = chunks[2] ?? "unknown";
+        const payload = message.content.toString();
+        const chunks = payload.split("|");
+        const scenario = chunks[0] ?? "flash-sale";
+        const phase = Number(chunks[1] ?? "3");
+        const requestId = chunks[2] ?? "unknown";
 
-      emitSimulationEvent({
-        scenario,
-        phase,
-        kind: "rabbitmq.consumed",
-        source: "rabbitmq",
-        target: "kafka",
-        data: {
-          requestId,
-          queue: queueName,
-        },
-        latencyMs: 0,
-        description: `RabbitMQ consumer received ${requestId}`,
+        emitSimulationEvent({
+          scenario,
+          phase,
+          kind: "rabbitmq.consumed",
+          source: "rabbitmq",
+          target: "kafka",
+          data: {
+            requestId,
+            queue: queueName,
+          },
+          latencyMs: 0,
+          description: `RabbitMQ ${queueName} consumed ${requestId}`,
+        });
+
+        rabbitChannel.ack(message);
+
+        emitSimulationEvent({
+          scenario,
+          phase,
+          kind: "rabbitmq.ack",
+          source: "rabbitmq",
+          target: "kafka",
+          data: {
+            requestId,
+            queue: queueName,
+          },
+          latencyMs: 0,
+          description: `RabbitMQ ACK ${requestId} on ${queueName}`,
+        });
       });
-
-      rabbitChannel.ack(message);
-
-      emitSimulationEvent({
-        scenario,
-        phase,
-        kind: "rabbitmq.ack",
-        source: "rabbitmq",
-        target: "kafka",
-        data: {
-          requestId,
-          queue: queueName,
-        },
-        latencyMs: 0,
-        description: `RabbitMQ ACK ${requestId}`,
-      });
-    });
+    }
 
     consumerInitialized = true;
   }
@@ -117,19 +127,21 @@ export async function publishRabbitMqMessage(
     description: `RabbitMQ published ${context.requestId}`,
   });
 
-  emitSimulationEvent({
-    scenario: context.scenario,
-    phase: context.phase,
-    kind: "rabbitmq.routed",
-    source: "rabbitmq",
-    target: "kafka",
-    data: {
-      requestId: context.requestId,
-      queue: queueName,
-    },
-    latencyMs,
-    description: `RabbitMQ routed ${context.requestId} to ${queueName}`,
-  });
+  for (const queueName of queueNames) {
+    emitSimulationEvent({
+      scenario: context.scenario,
+      phase: context.phase,
+      kind: "rabbitmq.routed",
+      source: "rabbitmq",
+      target: "kafka",
+      data: {
+        requestId: context.requestId,
+        queue: queueName,
+      },
+      latencyMs,
+      description: `RabbitMQ routed ${context.requestId} to ${queueName}`,
+    });
+  }
 }
 
 export async function closeRabbitMqConnection(): Promise<void> {

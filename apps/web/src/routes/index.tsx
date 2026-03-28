@@ -1,10 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MainCanvasShell } from "~/components/layout/main-canvas-shell";
+import { Navigate, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
 function HomePage() {
-  return <MainCanvasShell />;
+  return <Navigate to="/scenarios/flash-sale" />;
 }

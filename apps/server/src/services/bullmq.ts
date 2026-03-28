@@ -10,9 +10,10 @@ type SimulationJobData = {
   phase: number;
   requestId: string;
   shouldFail: boolean;
+  workflow: "flash-sale";
 };
 
-const queueName = "visualizer-phase1-simulation";
+const queueName = "visualizer-flash-sale-orders";
 
 const queue = new Queue<SimulationJobData>(queueName, {
   connection: {
@@ -27,7 +28,11 @@ let worker: Worker<SimulationJobData> | null = null;
 
 function emitJobEvent(
   job: Job<SimulationJobData>,
-  kind: "bullmq.job.processing" | "bullmq.job.completed" | "bullmq.job.failed",
+  kind:
+    | "bullmq.job.processing"
+    | "bullmq.job.completed"
+    | "bullmq.job.failed"
+    | "bullmq.job.progress",
   description: string,
   data: Record<string, string | number | boolean | null>,
 ): void {
@@ -58,10 +63,31 @@ function ensureBullMqWorker(): void {
         {
           requestId: job.data.requestId,
           jobId: job.id ?? null,
+          attemptsMade: job.attemptsMade,
         },
       );
 
-      await Bun.sleep(180);
+      const steps = [
+        { name: "payment", progress: 34 },
+        { name: "reserve_inventory", progress: 67 },
+        { name: "confirm", progress: 100 },
+      ] as const;
+
+      for (const step of steps) {
+        await Bun.sleep(85);
+
+        emitJobEvent(
+          job,
+          "bullmq.job.progress",
+          `Job ${job.id ?? "job"} ${step.name}`,
+          {
+            requestId: job.data.requestId,
+            jobId: job.id ?? null,
+            step: step.name,
+            progress: step.progress,
+          },
+        );
+      }
 
       if (job.data.shouldFail) {
         throw new Error("simulated_worker_failure");
@@ -76,6 +102,7 @@ function ensureBullMqWorker(): void {
         username: redisUrl.username || undefined,
         password: redisUrl.password || undefined,
       },
+      concurrency: 12,
     },
   );
 
@@ -87,6 +114,7 @@ function ensureBullMqWorker(): void {
       {
         requestId: job.data.requestId,
         jobId: job.id ?? null,
+        attemptsMade: job.attemptsMade,
       },
     );
   });
@@ -100,6 +128,9 @@ function ensureBullMqWorker(): void {
       requestId: job.data.requestId,
       jobId: job.id ?? null,
       reason: error.message,
+      attemptsMade: job.attemptsMade,
+      attemptsMax: job.opts.attempts ?? 1,
+      finalFailure: job.attemptsMade >= (job.opts.attempts ?? 1),
     });
   });
 }
@@ -111,7 +142,12 @@ export async function checkBullMqConnection(): Promise<void> {
 
 export async function enqueueBullMqJob(
   context: SimulationContext,
-  shouldFail: boolean,
+  options: {
+    shouldFail: boolean;
+    priority: number;
+    attempts: number;
+    backoffDelayMs: number;
+  },
 ): Promise<string> {
   await queue.waitUntilReady();
   ensureBullMqWorker();
@@ -124,12 +160,18 @@ export async function enqueueBullMqJob(
       scenario: context.scenario,
       phase: context.phase,
       requestId: context.requestId,
-      shouldFail,
+      shouldFail: options.shouldFail,
+      workflow: "flash-sale",
     },
     {
       removeOnComplete: 100,
       removeOnFail: 100,
-      attempts: 1,
+      attempts: options.attempts,
+      priority: options.priority,
+      backoff: {
+        type: "exponential",
+        delay: options.backoffDelayMs,
+      },
     },
   );
 
@@ -142,7 +184,9 @@ export async function enqueueBullMqJob(
     data: {
       requestId: context.requestId,
       jobId: job.id ?? null,
-      shouldFail,
+      shouldFail: options.shouldFail,
+      priority: options.priority,
+      attempts: options.attempts,
     },
     latencyMs: Math.round(performance.now() - startedAt),
     description: `BullMQ created job ${job.id ?? "job"}`,
