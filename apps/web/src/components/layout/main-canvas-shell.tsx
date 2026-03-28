@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EventFeed } from "~/components/event-log/event-feed";
 import { FlowCanvas } from "~/components/flow/flow-canvas";
 import { ConceptCard } from "~/components/learning/concept-card";
+import { SummaryCard } from "~/components/learning/summary-card";
 import { ActivityBar } from "~/components/monitor/activity-bar";
 import { Button } from "~/components/ui/button";
 import { useFlowState } from "~/hooks/use-flow-state";
@@ -622,6 +623,26 @@ function BankingOverlay({ events }: { events: SimulationEvent[] }) {
   );
 }
 
+function useThrottledEvents(
+  events: SimulationEvent[],
+  throttleMs: number,
+): SimulationEvent[] {
+  const [throttledEvents, setThrottledEvents] =
+    useState<SimulationEvent[]>(events);
+
+  useEffect(() => {
+    const timeoutHandle = setTimeout(() => {
+      setThrottledEvents(events);
+    }, throttleMs);
+
+    return () => {
+      clearTimeout(timeoutHandle);
+    };
+  }, [events, throttleMs]);
+
+  return throttledEvents;
+}
+
 export function MainCanvasShell({
   scenarioId,
 }: {
@@ -649,11 +670,23 @@ export function MainCanvasShell({
       stepCounter,
       scenarioId,
     });
-  const { nodes, edges, metrics } = useFlowState(events, scenarioId);
+  const throttledFlowEvents = useThrottledEvents(events, 120);
+  const { nodes, edges, metrics } = useFlowState(
+    throttledFlowEvents,
+    scenarioId,
+  );
   const [activeConcept, setActiveConcept] = useState<ConceptDefinition | null>(
     null,
   );
   const [shownConceptIds, setShownConceptIds] = useState<string[]>([]);
+
+  const showLoadingState =
+    connectionState === "connecting" && events.length === 0;
+  const showConnectionError =
+    connectionState === "error" || connectionState === "closed";
+  const scenarioCompleted = events.some(
+    (event) => event.kind === "scenario.complete",
+  );
 
   useEffect(() => {
     setCurrentPhase(1);
@@ -669,6 +702,25 @@ export function MainCanvasShell({
     jumpToPhase(phaseJumpRequest);
     clearPhaseJumpRequest();
   }, [clearPhaseJumpRequest, jumpToPhase, phaseJumpRequest]);
+
+  useEffect(() => {
+    if (connectionState !== "open") {
+      return;
+    }
+
+    const phaseParam = new URLSearchParams(window.location.search).get("phase");
+    if (!phaseParam) {
+      return;
+    }
+
+    const parsedPhase = Number(phaseParam);
+    if (!Number.isFinite(parsedPhase)) {
+      return;
+    }
+
+    const safePhase = Math.max(1, Math.trunc(parsedPhase));
+    jumpToPhase(safePhase);
+  }, [connectionState, jumpToPhase, scenarioId]);
 
   useEffect(() => {
     const latestEvent = events[events.length - 1];
@@ -730,7 +782,7 @@ export function MainCanvasShell({
   }, [events, scenarioContent.conceptDefinitions, shownConceptIds]);
 
   return (
-    <section className="neo-panel grid min-h-[60dvh] grid-rows-[1fr,auto,auto] gap-3 bg-[var(--background)] p-3">
+    <section className="neo-panel scenario-shell-enter grid min-h-[60dvh] grid-rows-[1fr,auto,auto,auto] gap-3 bg-[var(--background)] p-3">
       <div className="neo-panel relative overflow-hidden bg-[var(--surface)] p-4">
         <div className="absolute -top-16 right-8 h-40 w-40 rounded-full bg-[var(--main)]/25 blur-2xl" />
         <div className="absolute -bottom-14 left-8 h-32 w-32 rounded-full bg-[var(--rabbitmq)]/35 blur-2xl" />
@@ -754,6 +806,16 @@ export function MainCanvasShell({
           </div>
         </div>
 
+        {showConnectionError ? (
+          <div
+            role="alert"
+            className="neo-panel relative z-10 mt-3 bg-red-500/20 px-3 py-2 text-xs font-black uppercase tracking-wide"
+          >
+            Backend disconnected. Start server and infrastructure to resume live
+            simulation.
+          </div>
+        ) : null}
+
         {scenarioId === "ride-sharing" ? (
           <RideSharingOverlay events={events} />
         ) : null}
@@ -764,11 +826,15 @@ export function MainCanvasShell({
 
         {scenarioId === "banking" ? <BankingOverlay events={events} /> : null}
 
-        <div
-          className={`relative z-10 mt-4 ${whatIfEnabled ? "what-if-failure" : ""}`}
-        >
-          <FlowCanvas nodes={nodes} edges={edges} />
-        </div>
+        {showLoadingState ? (
+          <div className="neo-panel skeleton-wave relative z-10 mt-4 h-[460px] bg-[var(--background)]" />
+        ) : (
+          <div
+            className={`relative z-10 mt-4 ${whatIfEnabled ? "what-if-failure" : ""}`}
+          >
+            <FlowCanvas nodes={nodes} edges={edges} />
+          </div>
+        )}
 
         <div className="pointer-events-none absolute bottom-3 right-3 z-20">
           <ConceptCard
@@ -780,7 +846,17 @@ export function MainCanvasShell({
         </div>
       </div>
 
-      <ActivityBar metrics={metrics} events={events} />
+      <SummaryCard
+        scenarioId={scenarioId}
+        events={events}
+        isVisible={scenarioCompleted}
+      />
+
+      {showLoadingState ? (
+        <section className="neo-panel skeleton-wave h-28 bg-[var(--surface)]" />
+      ) : (
+        <ActivityBar metrics={metrics} events={throttledFlowEvents} />
+      )}
 
       <EventFeed events={events} />
     </section>

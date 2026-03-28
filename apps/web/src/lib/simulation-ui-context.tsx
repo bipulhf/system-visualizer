@@ -1,5 +1,6 @@
 import {
   createContext,
+  useEffect,
   useContext,
   useMemo,
   useState,
@@ -34,6 +35,13 @@ const SimulationUiContext = createContext<SimulationUiContextValue | null>(
   null,
 );
 
+const speedPresetByKey: Readonly<Record<string, PlaybackRate>> = {
+  "1": 0.5,
+  "2": 1,
+  "3": 2,
+  "4": 4,
+};
+
 export function SimulationUiProvider({ children }: { children: ReactNode }) {
   const {
     playbackRate,
@@ -51,6 +59,49 @@ export function SimulationUiProvider({ children }: { children: ReactNode }) {
   const [whatIfService, setWhatIfService] = useState<ServiceName>("redis");
   const [failureCount, setFailureCount] = useState<number>(0);
   const [phaseJumpRequest, setPhaseJumpRequest] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      const targetElement = event.target;
+      if (
+        targetElement instanceof HTMLInputElement ||
+        targetElement instanceof HTMLTextAreaElement ||
+        targetElement instanceof HTMLSelectElement ||
+        (targetElement instanceof HTMLElement &&
+          targetElement.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        togglePaused();
+        return;
+      }
+
+      if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && paused) {
+        event.preventDefault();
+        stepForward();
+        return;
+      }
+
+      const speedPreset = speedPresetByKey[event.key];
+      if (speedPreset !== undefined) {
+        event.preventDefault();
+        setPlaybackRate(speedPreset);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [paused, setPlaybackRate, stepForward, togglePaused]);
 
   const value = useMemo<SimulationUiContextValue>(
     () => ({

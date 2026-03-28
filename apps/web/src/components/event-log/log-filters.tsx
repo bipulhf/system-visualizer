@@ -38,6 +38,7 @@ export function LogFilters({
             <button
               key={service}
               type="button"
+              aria-pressed={active}
               onClick={() => {
                 toggleService(service);
               }}
@@ -58,6 +59,7 @@ export function LogFilters({
               <button
                 key={kind}
                 type="button"
+                aria-pressed={active}
                 onClick={() => {
                   toggleKind(kind);
                 }}

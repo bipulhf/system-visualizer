@@ -636,15 +636,15 @@ interface SimulationEvent {
 
 #### Landing Page (`routes/index.tsx`)
 
-- [ ] Hero section: bold neobrutalism typography, tagline, animated preview
-- [ ] 4 scenario cards with preview thumbnails and difficulty tags
-- [ ] "What you'll learn" section — grid of technology icons with one-liner descriptions
-- [ ] Quick-start CTA → jumps to Scenario 1
+- [x] Hero section: bold neobrutalism typography, tagline, animated preview
+- [x] 4 scenario cards with preview thumbnails and difficulty tags
+- [x] "What you'll learn" section — grid of technology icons with one-liner descriptions
+- [x] Quick-start CTA → jumps to Scenario 1
 
 #### Learn Section (`routes/learn/`)
 
-- [ ] Concepts glossary page — all concepts from all scenarios in a searchable grid
-- [ ] Individual concept pages with:
+- [x] Concepts glossary page — all concepts from all scenarios in a searchable grid
+- [x] Individual concept pages with:
   - Clear definition
   - Which scenarios use this concept
   - Visual diagram
@@ -652,22 +652,22 @@ interface SimulationEvent {
 
 #### Scenario Comparison View
 
-- [ ] Post-scenario summary card:
+- [x] Post-scenario summary card:
   - Technologies used and their roles
   - Total events processed, messages routed, jobs completed
   - Latency breakdown per service
   - "What you learned" checklist (concepts encountered)
-- [ ] Cross-scenario comparison: "Redis in Flash Sale vs Banking" — same tech, different purpose
+- [x] Cross-scenario comparison: "Redis in Flash Sale vs Banking" — same tech, different purpose
 
 #### Polish
 
-- [ ] Responsive layout (desktop-first, tablet-friendly)
-- [ ] Keyboard shortcuts (Space = pause, Arrow keys = step, 1-4 = speed presets)
-- [ ] Loading states with neobrutalism skeleton animations
-- [ ] Error states (backend disconnected, service down)
-- [ ] Smooth transitions between scenarios
-- [ ] Performance optimization: virtualized event log, throttled @xyflow updates
-- [ ] Accessibility: focus indicators, ARIA labels on interactive elements, reduced motion support
+- [x] Responsive layout (desktop-first, tablet-friendly)
+- [x] Keyboard shortcuts (Space = pause, Arrow keys = step, 1-4 = speed presets)
+- [x] Loading states with neobrutalism skeleton animations
+- [x] Error states (backend disconnected, service down)
+- [x] Smooth transitions between scenarios
+- [x] Performance optimization: virtualized event log, throttled @xyflow updates
+- [x] Accessibility: focus indicators, ARIA labels on interactive elements, reduced motion support
 
 **Deliverable:** Polished, complete application ready for deployment.
 

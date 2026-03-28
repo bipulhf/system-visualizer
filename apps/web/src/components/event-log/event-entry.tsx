@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { SimulationEvent, ServiceName } from "~/lib/event-types";
 
 const serviceColorVarByName: Record<ServiceName, string> = {
@@ -21,24 +20,25 @@ function formatTimestamp(timestamp: number): string {
 
 export function EventEntry({
   event,
-  learnMore,
+  selected,
+  onSelect,
 }: {
   event: SimulationEvent;
-  learnMore: string;
+  selected: boolean;
+  onSelect: (eventId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<boolean>(false);
-
   return (
     <li
-      className="neo-panel bg-[var(--background)] px-2 py-1"
+      className={`neo-panel h-[92px] bg-[var(--background)] px-2 py-1 ${selected ? "bg-[var(--surface)]" : ""}`}
       style={{ borderColor: `var(${serviceColorVarByName[event.source]})` }}
     >
       <button
         type="button"
-        className="w-full text-left"
+        className="h-full w-full text-left"
         onClick={() => {
-          setExpanded(!expanded);
+          onSelect(event.id);
         }}
+        aria-expanded={selected}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-black">
@@ -49,18 +49,10 @@ export function EventEntry({
           </span>
         </div>
         <p className="mt-0.5 text-xs font-black">{event.kind}</p>
-        <p className="text-xs font-semibold opacity-85">{event.description}</p>
+        <p className="line-clamp-2 text-xs font-semibold opacity-85">
+          {event.description}
+        </p>
       </button>
-
-      {expanded ? (
-        <div className="mt-2 space-y-1 border-t-2 border-[var(--border)] pt-2 text-[11px]">
-          <p className="font-bold">Latency: {event.latencyMs} ms</p>
-          <p className="font-bold">Learn More: {learnMore}</p>
-          <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-all bg-[var(--surface)] p-1.5 font-mono text-[10px]">
-            {JSON.stringify(event.data, null, 2)}
-          </pre>
-        </div>
-      ) : null}
     </li>
   );
 }

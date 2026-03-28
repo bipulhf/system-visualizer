@@ -47,6 +47,14 @@ type ScenarioLearningContent = {
   whatIfByService: Record<ServiceName, WhatIfEntry>;
 };
 
+export type ConceptGlossaryEntry = {
+  id: string;
+  title: string;
+  description: string;
+  triggerKinds: EventKind[];
+  scenarioIds: SupportedScenarioId[];
+};
+
 export const scenarioInfoById: Record<SupportedScenarioId, ScenarioInfo> = {
   "flash-sale": {
     title: "E-Commerce Flash Sale",
@@ -77,6 +85,13 @@ export const scenarioInfoById: Record<SupportedScenarioId, ScenarioInfo> = {
       "Transfer requests can duplicate, race, or trigger fraud review, but balances and ledger history must remain correct.",
   },
 };
+
+export const supportedScenarioIds: SupportedScenarioId[] = [
+  "flash-sale",
+  "ride-sharing",
+  "video-pipeline",
+  "banking",
+];
 
 export const scenarioLearningContent: Record<
   SupportedScenarioId,
@@ -744,6 +759,43 @@ export function getScenarioLearningContent(
   scenarioId: SupportedScenarioId,
 ): ScenarioLearningContent {
   return scenarioLearningContent[scenarioId];
+}
+
+export function getConceptGlossaryEntries(): ConceptGlossaryEntry[] {
+  const conceptMap = new Map<string, ConceptGlossaryEntry>();
+
+  for (const scenarioId of supportedScenarioIds) {
+    const content = scenarioLearningContent[scenarioId];
+
+    for (const concept of content.conceptDefinitions) {
+      const existing = conceptMap.get(concept.id);
+
+      if (!existing) {
+        conceptMap.set(concept.id, {
+          id: concept.id,
+          title: concept.title,
+          description: concept.description,
+          triggerKinds: [...concept.triggerKinds],
+          scenarioIds: [scenarioId],
+        });
+        continue;
+      }
+
+      if (!existing.scenarioIds.includes(scenarioId)) {
+        existing.scenarioIds.push(scenarioId);
+      }
+    }
+  }
+
+  return Array.from(conceptMap.values()).sort((left, right) =>
+    left.title.localeCompare(right.title),
+  );
+}
+
+export function getConceptById(conceptId: string): ConceptGlossaryEntry | null {
+  const conceptEntries = getConceptGlossaryEntries();
+  const conceptEntry = conceptEntries.find((entry) => entry.id === conceptId);
+  return conceptEntry ?? null;
 }
 
 export const flashSalePhases = scenarioLearningContent["flash-sale"].phases;

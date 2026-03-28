@@ -35,6 +35,7 @@ export function PhaseStepper({
             <li key={phase.id}>
               <button
                 type="button"
+                aria-current={isActive ? "step" : undefined}
                 onClick={() => {
                   setCurrentPhase(phase.id);
                   requestPhaseJump(phase.id);

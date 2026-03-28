@@ -56,6 +56,7 @@ export function WhatIfToggle({
             <button
               key={service}
               type="button"
+              aria-pressed={whatIfService === service}
               onClick={() => {
                 setWhatIfService(service);
               }}

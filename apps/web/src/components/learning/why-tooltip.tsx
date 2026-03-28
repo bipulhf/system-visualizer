@@ -35,6 +35,7 @@ export function WhyTooltip({
           <button
             key={service}
             type="button"
+            aria-pressed={service === activeService}
             onClick={() => {
               setSelectedService(service);
             }}

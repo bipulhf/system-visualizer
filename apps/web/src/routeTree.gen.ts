@@ -10,14 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LearnIndexRouteImport } from './routes/learn/index'
 import { Route as ScenariosVideoPipelineRouteImport } from './routes/scenarios/video-pipeline'
 import { Route as ScenariosRideSharingRouteImport } from './routes/scenarios/ride-sharing'
 import { Route as ScenariosFlashSaleRouteImport } from './routes/scenarios/flash-sale'
 import { Route as ScenariosBankingRouteImport } from './routes/scenarios/banking'
+import { Route as LearnConceptRouteImport } from './routes/learn/$concept'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnIndexRoute = LearnIndexRouteImport.update({
+  id: '/learn/',
+  path: '/learn/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScenariosVideoPipelineRoute = ScenariosVideoPipelineRouteImport.update({
@@ -40,59 +47,78 @@ const ScenariosBankingRoute = ScenariosBankingRouteImport.update({
   path: '/scenarios/banking',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LearnConceptRoute = LearnConceptRouteImport.update({
+  id: '/learn/$concept',
+  path: '/learn/$concept',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/learn/$concept': typeof LearnConceptRoute
   '/scenarios/banking': typeof ScenariosBankingRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
+  '/learn/': typeof LearnIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/learn/$concept': typeof LearnConceptRoute
   '/scenarios/banking': typeof ScenariosBankingRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
+  '/learn': typeof LearnIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/learn/$concept': typeof LearnConceptRoute
   '/scenarios/banking': typeof ScenariosBankingRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
+  '/learn/': typeof LearnIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/learn/$concept'
     | '/scenarios/banking'
     | '/scenarios/flash-sale'
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
+    | '/learn/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/learn/$concept'
     | '/scenarios/banking'
     | '/scenarios/flash-sale'
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
+    | '/learn'
   id:
     | '__root__'
     | '/'
+    | '/learn/$concept'
     | '/scenarios/banking'
     | '/scenarios/flash-sale'
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
+    | '/learn/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LearnConceptRoute: typeof LearnConceptRoute
   ScenariosBankingRoute: typeof ScenariosBankingRoute
   ScenariosFlashSaleRoute: typeof ScenariosFlashSaleRoute
   ScenariosRideSharingRoute: typeof ScenariosRideSharingRoute
   ScenariosVideoPipelineRoute: typeof ScenariosVideoPipelineRoute
+  LearnIndexRoute: typeof LearnIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -102,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn/': {
+      id: '/learn/'
+      path: '/learn'
+      fullPath: '/learn/'
+      preLoaderRoute: typeof LearnIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scenarios/video-pipeline': {
@@ -132,15 +165,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScenariosBankingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/learn/$concept': {
+      id: '/learn/$concept'
+      path: '/learn/$concept'
+      fullPath: '/learn/$concept'
+      preLoaderRoute: typeof LearnConceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LearnConceptRoute: LearnConceptRoute,
   ScenariosBankingRoute: ScenariosBankingRoute,
   ScenariosFlashSaleRoute: ScenariosFlashSaleRoute,
   ScenariosRideSharingRoute: ScenariosRideSharingRoute,
   ScenariosVideoPipelineRoute: ScenariosVideoPipelineRoute,
+  LearnIndexRoute: LearnIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
