@@ -1,6 +1,14 @@
 import { Elysia } from "elysia";
 import { onSimulationEvent } from "./events/emitter";
 import {
+  getBankingStatus,
+  isBankingScenarioRunning,
+  setBankingScenarioPhase,
+  setBankingTransferTarget,
+  startBankingScenario,
+  stopBankingScenario,
+} from "./scenarios/banking";
+import {
   getFlashSaleStatus,
   isFlashSaleScenarioRunning,
   setFlashSaleRequestTarget,
@@ -98,9 +106,14 @@ async function getServiceHealth(): Promise<HealthResponse> {
 
 let simulationClientCount = 0;
 
-type ActiveScenarioId = "flash-sale" | "ride-sharing" | "video-pipeline";
+type ActiveScenarioId =
+  | "flash-sale"
+  | "ride-sharing"
+  | "video-pipeline"
+  | "banking";
 
 type ScenarioStatus =
+  | ReturnType<typeof getBankingStatus>
   | ReturnType<typeof getFlashSaleStatus>
   | ReturnType<typeof getRideSharingStatus>
   | ReturnType<typeof getVideoPipelineStatus>;
@@ -108,6 +121,10 @@ type ScenarioStatus =
 let activeScenario: ActiveScenarioId = "flash-sale";
 
 function isScenarioRunning(scenario: ActiveScenarioId): boolean {
+  if (scenario === "banking") {
+    return isBankingScenarioRunning();
+  }
+
   if (scenario === "flash-sale") {
     return isFlashSaleScenarioRunning();
   }
@@ -120,6 +137,10 @@ function isScenarioRunning(scenario: ActiveScenarioId): boolean {
 }
 
 function getScenarioStatus(scenario: ActiveScenarioId): ScenarioStatus {
+  if (scenario === "banking") {
+    return getBankingStatus();
+  }
+
   if (scenario === "flash-sale") {
     return getFlashSaleStatus();
   }
@@ -132,6 +153,11 @@ function getScenarioStatus(scenario: ActiveScenarioId): ScenarioStatus {
 }
 
 async function startScenario(scenario: ActiveScenarioId): Promise<void> {
+  if (scenario === "banking") {
+    await startBankingScenario();
+    return;
+  }
+
   if (scenario === "flash-sale") {
     await startFlashSaleScenario();
     return;
@@ -146,6 +172,11 @@ async function startScenario(scenario: ActiveScenarioId): Promise<void> {
 }
 
 function setScenarioPhase(scenario: ActiveScenarioId, phase: number): void {
+  if (scenario === "banking") {
+    setBankingScenarioPhase(phase);
+    return;
+  }
+
   if (scenario === "flash-sale") {
     setFlashSaleScenarioPhase(phase);
     return;
@@ -160,7 +191,7 @@ function setScenarioPhase(scenario: ActiveScenarioId, phase: number): void {
 }
 
 function getScenarioPhaseLimit(scenario: ActiveScenarioId): number {
-  if (scenario === "video-pipeline") {
+  if (scenario === "video-pipeline" || scenario === "banking") {
     return 5;
   }
 
@@ -169,6 +200,7 @@ function getScenarioPhaseLimit(scenario: ActiveScenarioId): number {
 
 async function stopAllScenarios(): Promise<void> {
   await Promise.all([
+    stopBankingScenario(),
     stopFlashSaleScenario(),
     stopRideSharingScenario(),
     stopVideoPipelineScenario(),
@@ -261,6 +293,7 @@ const app = new Elysia()
       connectedClients: simulationClientCount,
       scenario: activeScenario,
       status,
+      bankingStatus: getBankingStatus(),
       flashSaleStatus: getFlashSaleStatus(),
       rideSharingStatus: getRideSharingStatus(),
       videoPipelineStatus: getVideoPipelineStatus(),
@@ -332,6 +365,7 @@ const app = new Elysia()
 
         if (command.command === "set_scenario") {
           if (
+            command.scenario !== "banking" &&
             command.scenario !== "flash-sale" &&
             command.scenario !== "ride-sharing" &&
             command.scenario !== "video-pipeline"
@@ -367,6 +401,15 @@ const app = new Elysia()
           }
 
           setVideoPipelineUploadTarget(command.requestTarget);
+          return;
+        }
+
+        if (command.command === "set_banking_transfer_target") {
+          if (typeof command.requestTarget !== "number") {
+            return;
+          }
+
+          setBankingTransferTarget(command.requestTarget);
         }
       } catch {
         return;

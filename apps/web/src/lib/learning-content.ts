@@ -3,7 +3,8 @@ import type { EventKind, ServiceName } from "~/lib/event-types";
 export type SupportedScenarioId =
   | "flash-sale"
   | "ride-sharing"
-  | "video-pipeline";
+  | "video-pipeline"
+  | "banking";
 
 export type ScenarioInfo = {
   title: string;
@@ -67,6 +68,13 @@ export const scenarioInfoById: Record<SupportedScenarioId, ScenarioInfo> = {
       "Coordinate parent-child jobs, failure isolation, and publish readiness fan-out.",
     problem:
       "Each upload must fan out into multiple renditions while surviving partial failure and preserving final consistency.",
+  },
+  banking: {
+    title: "Banking Transaction Ledger",
+    tagline:
+      "Protect financial correctness with idempotency, serializable transfers, fraud holds, and replicated audit trails.",
+    problem:
+      "Transfer requests can duplicate, race, or trigger fraud review, but balances and ledger history must remain correct.",
   },
 };
 
@@ -556,6 +564,177 @@ export const scenarioLearningContent: Record<
         failureMode: "Missing final source of truth",
         explanation:
           "Without final transactional writes, reporting and reconciliation drift from actual pipeline outcomes.",
+      },
+    },
+  },
+  banking: {
+    phases: [
+      {
+        id: 1,
+        title: "Admission Gate",
+        description:
+          "Requests hit rate limiting, idempotency keys, and temporary account locks before money moves.",
+        services: ["elysia", "redis"],
+      },
+      {
+        id: 2,
+        title: "Serializable Transfer",
+        description:
+          "Debit, credit, and ledger writes execute inside one SERIALIZABLE transaction.",
+        services: ["postgres"],
+      },
+      {
+        id: 3,
+        title: "Fraud Decision & Hold",
+        description:
+          "RabbitMQ confirm + synchronous fraud reply decides immediate approval or BullMQ hold review.",
+        services: ["rabbitmq", "bullmq", "postgres"],
+      },
+      {
+        id: 4,
+        title: "Replicated Ledger Stream",
+        description:
+          "Approved transfers append to Kafka with visible replication-style fan-out.",
+        services: ["kafka"],
+      },
+      {
+        id: 5,
+        title: "Audit Read & Backup",
+        description:
+          "The transfer is verified from PostgreSQL and copied to backup stream events.",
+        services: ["postgres", "kafka"],
+      },
+    ],
+    whyTechByService: {
+      elysia: {
+        service: "elysia",
+        title: "Elysia for Low-Latency Intake",
+        reason:
+          "Fast request admission keeps transfer submission responsive while downstream consistency work happens asynchronously.",
+        comparison:
+          "Blocking API handlers under fraud and ledger checks increase timeout risk during spikes.",
+        keyMetric: "Low overhead transfer request admission",
+      },
+      redis: {
+        service: "redis",
+        title: "Redis for Idempotency and Locks",
+        reason:
+          "SETNX + TTL blocks duplicate transfer IDs and temporary account lock collisions without expensive database waits.",
+        comparison:
+          "Without fast distributed keys, duplicate requests can race into expensive transaction retries.",
+        keyMetric:
+          "Sub-millisecond duplicate suppression and short-lived locks",
+      },
+      bullmq: {
+        service: "bullmq",
+        title: "BullMQ for Delayed Manual Review",
+        reason:
+          "Held transfers pause on a visible delayed-review workflow and resume deterministically when review completes.",
+        comparison:
+          "Ad-hoc timers in API code are brittle and hard to recover after restarts.",
+        keyMetric: "Durable delayed hold workflow with progress countdown",
+      },
+      rabbitmq: {
+        service: "rabbitmq",
+        title: "RabbitMQ for Confirmed Fraud Requests",
+        reason:
+          "Publisher confirms prove request durability, while request/reply patterns return synchronous fraud decisions.",
+        comparison:
+          "Fire-and-forget broker writes can lose fraud checks silently under channel disruption.",
+        keyMetric: "Publisher confirm ACK + synchronous fraud decision reply",
+      },
+      kafka: {
+        service: "kafka",
+        title: "Kafka for Immutable Replicated Ledger",
+        reason:
+          "Ledger events append once and feed live ledger, risk review, and backup audit consumers independently.",
+        comparison:
+          "Single consumer pipelines lose replayability and limit downstream evolution.",
+        keyMetric: "One append, multiple independent consumer groups",
+      },
+      postgres: {
+        service: "postgres",
+        title: "PostgreSQL for ACID Financial Truth",
+        reason:
+          "SERIALIZABLE transactions guarantee ledger correctness across concurrent debit/credit operations.",
+        comparison:
+          "Lower isolation levels can permit write skew and inconsistent balances under contention.",
+        keyMetric: "Serializable transfer correctness and durable audit reads",
+      },
+    },
+    conceptDefinitions: [
+      {
+        id: "idempotency",
+        title: "Idempotency",
+        description:
+          "Repeated requests with the same transfer ID resolve safely to one effective operation.",
+        triggerKinds: ["redis.op", "request.rejected"],
+      },
+      {
+        id: "acid-transactions",
+        title: "ACID Transactions",
+        description:
+          "Atomic, consistent, isolated, and durable commits keep account and ledger state aligned.",
+        triggerKinds: ["postgres.tx.begin", "postgres.tx.commit"],
+      },
+      {
+        id: "publisher-confirms",
+        title: "Publisher Confirms",
+        description:
+          "The broker acknowledges message durability back to the producer before processing continues.",
+        triggerKinds: ["rabbitmq.published", "rabbitmq.ack"],
+      },
+      {
+        id: "replication-factor",
+        title: "Replication Factor",
+        description:
+          "Multiple replicas provide durable event availability for consumers and recovery.",
+        triggerKinds: ["kafka.produced", "kafka.consumed"],
+      },
+      {
+        id: "immutable-log",
+        title: "Immutable Log",
+        description:
+          "Appending events instead of mutating history preserves auditability and replay.",
+        triggerKinds: ["kafka.produced", "scenario.complete"],
+      },
+    ],
+    whatIfByService: {
+      elysia: {
+        service: "elysia",
+        failureMode: "Slow transfer intake",
+        explanation:
+          "Delayed admission creates customer retry storms before idempotency guards can stabilize traffic.",
+      },
+      redis: {
+        service: "redis",
+        failureMode: "Duplicate financial operations",
+        explanation:
+          "Without idempotency keys and short locks, repeated submits can race into multiple transfer attempts.",
+      },
+      bullmq: {
+        service: "bullmq",
+        failureMode: "Untracked hold backlog",
+        explanation:
+          "Without durable delayed jobs, manual review queues become opaque and easy to lose on restart.",
+      },
+      rabbitmq: {
+        service: "rabbitmq",
+        failureMode: "Unverified fraud requests",
+        explanation:
+          "Without publisher confirms and replies, the transfer flow cannot know if fraud checks were persisted or decided.",
+      },
+      kafka: {
+        service: "kafka",
+        failureMode: "No replayable ledger history",
+        explanation:
+          "Without immutable streaming, backup and risk systems cannot reconstruct prior transfer decisions.",
+      },
+      postgres: {
+        service: "postgres",
+        failureMode: "Inconsistent account balances",
+        explanation:
+          "Without serializable transactions, concurrent debits can violate invariant checks and corrupt ledger truth.",
       },
     },
   },

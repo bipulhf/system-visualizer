@@ -5,7 +5,7 @@ const scenarioTabs = [
   { label: "Flash Sale", to: "/scenarios/flash-sale", enabled: true },
   { label: "Ride Sharing", to: "/scenarios/ride-sharing", enabled: true },
   { label: "Video Pipeline", to: "/scenarios/video-pipeline", enabled: true },
-  { label: "Banking", to: "/", enabled: false },
+  { label: "Banking", to: "/scenarios/banking", enabled: true },
 ] as const;
 
 export function ScenarioTabs() {
@@ -16,8 +16,7 @@ export function ScenarioTabs() {
   return (
     <nav className="flex flex-wrap gap-2" aria-label="Scenario tabs">
       {scenarioTabs.map((tab) => {
-        const isActive =
-          tab.to === "/" ? pathname === "/" : pathname.startsWith(tab.to);
+        const isActive = pathname.startsWith(tab.to);
 
         if (!tab.enabled) {
           return (

@@ -607,26 +607,26 @@ interface SimulationEvent {
 
 #### Backend Simulation (`scenarios/banking.ts`)
 
-- [ ] Phase 1 — Redis rate limit, idempotency check, account lock
-- [ ] Phase 2 — PostgreSQL SERIALIZABLE transaction (debit, credit, ledger entry)
+- [x] Phase 1 — Redis rate limit, idempotency check, account lock
+- [x] Phase 2 — PostgreSQL SERIALIZABLE transaction (debit, credit, ledger entry)
   - Redis idempotency record with 24h TTL
-- [ ] Phase 3 — RabbitMQ with publisher confirms
+- [x] Phase 3 — RabbitMQ with publisher confirms
   - Fraud detection with synchronous reply pattern
   - BullMQ delayed review job if fraud hold
-- [ ] Phase 4 — Kafka with replication factor 3 visualization
+- [x] Phase 4 — Kafka with replication factor 3 visualization
   - Multiple consumer groups
-- [ ] Phase 5 — Audit query reads from PostgreSQL + Kafka backup
+- [x] Phase 5 — Audit query reads from PostgreSQL + Kafka backup
 
 #### Frontend Integration
 
-- [ ] @xyflow layout emphasizing data integrity flow
-- [ ] Redis idempotency visualization — duplicate request bouncing off
-- [ ] PostgreSQL transaction as a grouped atomic block (visual grouping)
-- [ ] RabbitMQ publisher confirms — ACK arrows flowing back
-- [ ] Kafka replication — data visually written to 3 nodes
-- [ ] BullMQ delayed job with countdown timer
-- [ ] Learning content: idempotency, SERIALIZABLE isolation, publisher confirms, replication, audit trails
-- [ ] Concept cards: "Idempotency", "ACID Transactions", "Publisher Confirms", "Replication Factor", "Immutable Log"
+- [x] @xyflow layout emphasizing data integrity flow
+- [x] Redis idempotency visualization — duplicate request bouncing off
+- [x] PostgreSQL transaction as a grouped atomic block (visual grouping)
+- [x] RabbitMQ publisher confirms — ACK arrows flowing back
+- [x] Kafka replication — data visually written to 3 nodes
+- [x] BullMQ delayed job with countdown timer
+- [x] Learning content: idempotency, SERIALIZABLE isolation, publisher confirms, replication, audit trails
+- [x] Concept cards: "Idempotency", "ACID Transactions", "Publisher Confirms", "Replication Factor", "Immutable Log"
 
 **Deliverable:** Complete Scenario 4 with all learning features.
 

@@ -3,6 +3,10 @@ import type { SupportedScenarioId } from "~/lib/learning-content";
 export function resolveScenarioFromPathname(
   pathname: string,
 ): SupportedScenarioId {
+  if (pathname.startsWith("/scenarios/banking")) {
+    return "banking";
+  }
+
   if (pathname.startsWith("/scenarios/video-pipeline")) {
     return "video-pipeline";
   }

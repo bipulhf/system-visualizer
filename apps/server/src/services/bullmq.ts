@@ -50,6 +50,16 @@ type VideoChildJobData = {
   progressTtlSeconds: number;
 };
 
+type BankingReviewJobData = {
+  scenario: string;
+  phase: number;
+  requestId: string;
+  workflow: "banking-review";
+  transferId: string;
+  reason: string;
+  holdSeconds: number;
+};
+
 type RideDispatchResult = {
   selectedDriverId: string;
   passengerId: string;
@@ -65,6 +75,11 @@ type VideoChildResult = {
   uploadId: string;
 };
 
+type BankingReviewResult = {
+  transferId: string;
+  decision: "approved_after_review";
+};
+
 const redisConnection = {
   host: redisUrl.hostname,
   port: Number(redisUrl.port || "6379"),
@@ -76,6 +91,7 @@ const flashSaleQueueName = "visualizer-flash-sale-orders";
 const rideDispatchQueueName = "visualizer-ride-sharing-dispatch";
 const videoParentQueueName = "visualizer-video-pipeline-parent";
 const videoChildQueueName = "visualizer-video-pipeline-child";
+const bankingReviewQueueName = "visualizer-banking-review";
 
 const flashSaleQueue = new Queue<FlashSaleJobData>(flashSaleQueueName, {
   connection: redisConnection,
@@ -96,19 +112,31 @@ const videoChildQueue = new Queue<VideoChildJobData>(videoChildQueueName, {
   connection: redisConnection,
 });
 
+const bankingReviewQueue = new Queue<BankingReviewJobData>(
+  bankingReviewQueueName,
+  {
+    connection: redisConnection,
+  },
+);
+
 let flashSaleWorker: Worker<FlashSaleJobData> | null = null;
 let rideDispatchWorker: Worker<RideDispatchJobData, RideDispatchResult> | null =
   null;
 let videoParentWorker: Worker<VideoParentJobData, VideoParentResult> | null =
   null;
 let videoChildWorker: Worker<VideoChildJobData, VideoChildResult> | null = null;
+let bankingReviewWorker: Worker<
+  BankingReviewJobData,
+  BankingReviewResult
+> | null = null;
 
 function emitBullMqEvent(
   job:
     | Job<FlashSaleJobData>
     | Job<RideDispatchJobData>
     | Job<VideoParentJobData>
-    | Job<VideoChildJobData>,
+    | Job<VideoChildJobData>
+    | Job<BankingReviewJobData>,
   kind:
     | "bullmq.job.processing"
     | "bullmq.job.completed"
@@ -532,15 +560,111 @@ function ensureVideoChildWorker(): void {
   });
 }
 
+function ensureBankingReviewWorker(): void {
+  if (bankingReviewWorker) {
+    return;
+  }
+
+  bankingReviewWorker = new Worker<BankingReviewJobData, BankingReviewResult>(
+    bankingReviewQueueName,
+    async (job) => {
+      emitBullMqEvent(
+        job,
+        "bullmq.job.processing",
+        `Banking review started ${job.data.transferId}`,
+        {
+          requestId: job.data.requestId,
+          transferId: job.data.transferId,
+          workflow: job.data.workflow,
+          reason: job.data.reason,
+          holdSeconds: job.data.holdSeconds,
+          jobId: job.id ?? null,
+        },
+      );
+
+      const countdownSteps = [
+        job.data.holdSeconds,
+        Math.max(1, Math.trunc(job.data.holdSeconds / 2)),
+        1,
+      ] as const;
+
+      for (const remainingSeconds of countdownSteps) {
+        await Bun.sleep(120);
+
+        emitBullMqEvent(
+          job,
+          "bullmq.job.progress",
+          `Banking hold countdown ${remainingSeconds}s`,
+          {
+            requestId: job.data.requestId,
+            transferId: job.data.transferId,
+            workflow: job.data.workflow,
+            step: "review_hold",
+            timeRemainingSec: remainingSeconds,
+            reason: job.data.reason,
+          },
+        );
+      }
+
+      return {
+        transferId: job.data.transferId,
+        decision: "approved_after_review",
+      };
+    },
+    {
+      connection: redisConnection,
+      concurrency: 4,
+    },
+  );
+
+  bankingReviewWorker.on("completed", (job, result) => {
+    emitBullMqEvent(
+      job,
+      "bullmq.job.completed",
+      `Banking review completed ${result.transferId}`,
+      {
+        requestId: job.data.requestId,
+        transferId: result.transferId,
+        workflow: job.data.workflow,
+        decision: result.decision,
+        jobId: job.id ?? null,
+      },
+    );
+  });
+
+  bankingReviewWorker.on("failed", (job, error) => {
+    if (!job) {
+      return;
+    }
+
+    emitBullMqEvent(
+      job,
+      "bullmq.job.failed",
+      `Banking review failed ${job.data.transferId}`,
+      {
+        requestId: job.data.requestId,
+        transferId: job.data.transferId,
+        workflow: job.data.workflow,
+        reason: error.message,
+        attemptsMade: job.attemptsMade,
+        attemptsMax: job.opts.attempts ?? 1,
+        finalFailure: job.attemptsMade >= (job.opts.attempts ?? 1),
+      },
+    );
+  });
+}
+
 export async function checkBullMqConnection(): Promise<void> {
   await flashSaleQueue.waitUntilReady();
   await rideDispatchQueue.waitUntilReady();
   await videoParentQueue.waitUntilReady();
   await videoChildQueue.waitUntilReady();
+  await bankingReviewQueue.waitUntilReady();
   ensureFlashSaleWorker();
   ensureRideDispatchWorker();
   ensureVideoParentWorker();
   ensureVideoChildWorker();
+  ensureBankingReviewWorker();
 }
 
 export async function enqueueBullMqJob(
@@ -777,6 +901,60 @@ export async function enqueueVideoPipelineChildJob(
   return job.id ? String(job.id) : context.requestId;
 }
 
+export async function enqueueBankingReviewJob(
+  context: SimulationContext,
+  options: {
+    transferId: string;
+    reason: string;
+    holdSeconds: number;
+    reviewDelayMs: number;
+  },
+): Promise<string> {
+  await bankingReviewQueue.waitUntilReady();
+  ensureBankingReviewWorker();
+
+  const startedAt = performance.now();
+  const job = await bankingReviewQueue.add(
+    "banking-review",
+    {
+      scenario: context.scenario,
+      phase: context.phase,
+      requestId: context.requestId,
+      workflow: "banking-review",
+      transferId: options.transferId,
+      reason: options.reason,
+      holdSeconds: options.holdSeconds,
+    },
+    {
+      removeOnComplete: 100,
+      removeOnFail: 100,
+      delay: options.reviewDelayMs,
+      attempts: 1,
+    },
+  );
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "bullmq.job.created",
+    source: "bullmq",
+    target: "rabbitmq",
+    data: {
+      requestId: context.requestId,
+      transferId: options.transferId,
+      workflow: "banking-review",
+      reason: options.reason,
+      holdSeconds: options.holdSeconds,
+      reviewDelayMs: options.reviewDelayMs,
+      jobId: job.id ?? null,
+    },
+    latencyMs: Math.round(performance.now() - startedAt),
+    description: `BullMQ created banking review job ${job.id ?? "job"}`,
+  });
+
+  return job.id ? String(job.id) : context.requestId;
+}
+
 export async function closeBullMqConnection(): Promise<void> {
   if (flashSaleWorker) {
     await flashSaleWorker.close();
@@ -798,8 +976,14 @@ export async function closeBullMqConnection(): Promise<void> {
     videoChildWorker = null;
   }
 
+  if (bankingReviewWorker) {
+    await bankingReviewWorker.close();
+    bankingReviewWorker = null;
+  }
+
   await flashSaleQueue.close();
   await rideDispatchQueue.close();
   await videoParentQueue.close();
   await videoChildQueue.close();
+  await bankingReviewQueue.close();
 }

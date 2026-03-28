@@ -321,6 +321,36 @@ export async function setExpiringRedisValue(
   );
 }
 
+export async function setRedisValueIfAbsent(
+  key: string,
+  value: string,
+  ttlSeconds: number,
+  context: SimulationContext,
+  target?: "bullmq" | "rabbitmq" | "kafka" | "postgres",
+): Promise<boolean> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+  const result = await redis.set(key, value, "EX", ttlSeconds, "NX");
+  const applied = result === "OK";
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "SETNX",
+      key,
+      value,
+      ttlSeconds,
+      applied,
+      requestId: context.requestId,
+    },
+    `Redis SETNX ${key} -> ${applied ? "applied" : "exists"}`,
+    target,
+    Math.round(performance.now() - startedAt),
+  );
+
+  return applied;
+}
+
 export async function deleteRedisKey(
   key: string,
   context: SimulationContext,

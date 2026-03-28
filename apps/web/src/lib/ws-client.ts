@@ -15,7 +15,8 @@ export type SimulationConnectionState =
 export type SimulationScenario =
   | "flash-sale"
   | "ride-sharing"
-  | "video-pipeline";
+  | "video-pipeline"
+  | "banking";
 
 type SimulationSocketHandlers = {
   onStateChange: (state: SimulationConnectionState) => void;

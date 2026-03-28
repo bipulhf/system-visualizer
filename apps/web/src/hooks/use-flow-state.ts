@@ -83,6 +83,37 @@ type VideoGraphSnapshot = {
   dlqRenditions: Set<VideoRendition>;
 };
 
+type BankingGraphSnapshot = {
+  idempotencySetAttempts: number;
+  duplicateBounces: number;
+  txBegins: number;
+  txCommits: number;
+  publisherConfirmAcks: number;
+  reviewJobsQueued: number;
+  reviewJobsCompleted: number;
+  latestReviewCountdownSec: number | null;
+  replicaWrites: number;
+};
+
+const bankingNodePositions: Record<
+  | "idempotency"
+  | "transaction"
+  | "review"
+  | "confirm"
+  | "replica-1"
+  | "replica-2"
+  | "replica-3",
+  { x: number; y: number }
+> = {
+  idempotency: { x: 214, y: 168 },
+  transaction: { x: 640, y: 210 },
+  review: { x: 420, y: 424 },
+  confirm: { x: 520, y: 62 },
+  "replica-1": { x: 944, y: 52 },
+  "replica-2": { x: 944, y: 132 },
+  "replica-3": { x: 944, y: 212 },
+};
+
 export interface ServiceMetric {
   service: ServiceName;
   label: string;
@@ -270,6 +301,112 @@ function createVideoGraphSnapshot(
   };
 }
 
+function createBankingGraphSnapshot(
+  events: SimulationEvent[],
+): BankingGraphSnapshot {
+  let idempotencySetAttempts = 0;
+  let duplicateBounces = 0;
+  let txBegins = 0;
+  let txCommits = 0;
+  let publisherConfirmAcks = 0;
+  let reviewJobsQueued = 0;
+  let reviewJobsCompleted = 0;
+  let latestReviewCountdownSec: number | null = null;
+  let replicaWrites = 0;
+
+  for (const event of events) {
+    if (event.kind === "redis.op") {
+      if (
+        event.data.operation === "SETNX" &&
+        typeof event.data.key === "string" &&
+        event.data.key.startsWith("banking:idempotency:")
+      ) {
+        idempotencySetAttempts += 1;
+      }
+
+      continue;
+    }
+
+    if (
+      event.kind === "request.rejected" &&
+      event.data.reason === "duplicate_request"
+    ) {
+      duplicateBounces += 1;
+      continue;
+    }
+
+    if (event.kind === "postgres.tx.begin") {
+      if (typeof event.data.transferId === "string") {
+        txBegins += 1;
+      }
+      continue;
+    }
+
+    if (event.kind === "postgres.tx.commit") {
+      if (typeof event.data.transferId === "string") {
+        txCommits += 1;
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "rabbitmq.ack" &&
+      event.data.ackType === "publisher_confirm"
+    ) {
+      publisherConfirmAcks += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.created" &&
+      event.data.workflow === "banking-review"
+    ) {
+      reviewJobsQueued += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.completed" &&
+      event.data.workflow === "banking-review"
+    ) {
+      reviewJobsCompleted += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.progress" &&
+      event.data.workflow === "banking-review" &&
+      event.data.step === "review_hold" &&
+      typeof event.data.timeRemainingSec === "number"
+    ) {
+      latestReviewCountdownSec = event.data.timeRemainingSec;
+      continue;
+    }
+
+    if (event.kind === "kafka.produced") {
+      const detail = event.data.detail;
+      if (
+        typeof detail === "string" &&
+        detail.startsWith("replica.sync.node_")
+      ) {
+        replicaWrites += 1;
+      }
+    }
+  }
+
+  return {
+    idempotencySetAttempts,
+    duplicateBounces,
+    txBegins,
+    txCommits,
+    publisherConfirmAcks,
+    reviewJobsQueued,
+    reviewJobsCompleted,
+    latestReviewCountdownSec,
+    replicaWrites,
+  };
+}
+
 export function useFlowState(
   events: SimulationEvent[],
   scenarioId: SupportedScenarioId,
@@ -407,7 +544,7 @@ export function useFlowState(
       },
     );
 
-    if (scenarioId !== "video-pipeline") {
+    if (scenarioId !== "video-pipeline" && scenarioId !== "banking") {
       return {
         nodes,
         edges,
@@ -415,116 +552,357 @@ export function useFlowState(
       };
     }
 
-    const videoSnapshot = createVideoGraphSnapshot(events);
+    if (scenarioId === "video-pipeline") {
+      const videoSnapshot = createVideoGraphSnapshot(events);
 
-    const videoNodes: Node<ServiceNodeData, "serviceNode">[] = [];
-
-    videoNodes.push({
-      id: "video-parent",
-      type: "serviceNode",
-      position: videoNodePositions.parent,
-      data: {
-        service: "bullmq",
-        label: "Parent Flow",
-        status: videoSnapshot.parentCreated > 0 ? "active" : "idle",
-        opsPerSec: videoSnapshot.parentCreated,
-        queueDepth: 0,
-        colorVar: "--bullmq",
-      },
-    });
-
-    for (const rendition of videoRenditions) {
-      const createdCount = videoSnapshot.childCreatedByRendition[rendition];
-      const progress = videoSnapshot.progressByRendition[rendition];
-      const inDlq = videoSnapshot.dlqRenditions.has(rendition);
-
-      const status: ServiceStatus = inDlq
-        ? "error"
-        : createdCount > 0 || progress > 0
-          ? "active"
-          : "idle";
+      const videoNodes: Node<ServiceNodeData, "serviceNode">[] = [];
 
       videoNodes.push({
-        id: `video-child-${rendition}`,
+        id: "video-parent",
         type: "serviceNode",
-        position: videoNodePositions[`child-${rendition}`],
+        position: videoNodePositions.parent,
         data: {
           service: "bullmq",
-          label: `${rendition}${inDlq ? " DLQ" : ` ${progress}%`}`,
-          status,
-          opsPerSec: Number((progress / 100).toFixed(1)),
-          queueDepth: inDlq ? 1 : 0,
+          label: "Parent Flow",
+          status: videoSnapshot.parentCreated > 0 ? "active" : "idle",
+          opsPerSec: videoSnapshot.parentCreated,
+          queueDepth: 0,
           colorVar: "--bullmq",
         },
       });
+
+      for (const rendition of videoRenditions) {
+        const createdCount = videoSnapshot.childCreatedByRendition[rendition];
+        const progress = videoSnapshot.progressByRendition[rendition];
+        const inDlq = videoSnapshot.dlqRenditions.has(rendition);
+
+        const status: ServiceStatus = inDlq
+          ? "error"
+          : createdCount > 0 || progress > 0
+            ? "active"
+            : "idle";
+
+        videoNodes.push({
+          id: `video-child-${rendition}`,
+          type: "serviceNode",
+          position: videoNodePositions[`child-${rendition}`],
+          data: {
+            service: "bullmq",
+            label: `${rendition}${inDlq ? " DLQ" : ` ${progress}%`}`,
+            status,
+            opsPerSec: Number((progress / 100).toFixed(1)),
+            queueDepth: inDlq ? 1 : 0,
+            colorVar: "--bullmq",
+          },
+        });
+      }
+
+      videoNodes.push({
+        id: "video-dlq",
+        type: "serviceNode",
+        position: videoNodePositions.dlq,
+        data: {
+          service: "bullmq",
+          label: "DLQ Graveyard",
+          status: videoSnapshot.dlqRenditions.size > 0 ? "error" : "idle",
+          opsPerSec: videoSnapshot.dlqRenditions.size,
+          queueDepth: videoSnapshot.dlqRenditions.size,
+          colorVar: "--rabbitmq",
+        },
+      });
+
+      const videoEdges: Edge<AnimatedEdgeData, "animatedEdge">[] = [
+        {
+          id: "bullmq->video-parent",
+          source: "bullmq",
+          target: "video-parent",
+          type: "animatedEdge",
+          animated: videoSnapshot.parentCreated > 0,
+          data: {
+            messageCount: videoSnapshot.parentCreated,
+            colorVar: "--bullmq",
+            active: videoSnapshot.parentCreated > 0,
+          },
+        },
+      ];
+
+      for (const rendition of videoRenditions) {
+        const createdCount = videoSnapshot.childCreatedByRendition[rendition];
+
+        videoEdges.push({
+          id: `video-parent->video-child-${rendition}`,
+          source: "video-parent",
+          target: `video-child-${rendition}`,
+          type: "animatedEdge",
+          animated: createdCount > 0,
+          data: {
+            messageCount: createdCount,
+            colorVar: "--bullmq",
+            active: createdCount > 0,
+          },
+        });
+
+        if (!videoSnapshot.dlqRenditions.has(rendition)) {
+          continue;
+        }
+
+        videoEdges.push({
+          id: `video-child-${rendition}->video-dlq`,
+          source: `video-child-${rendition}`,
+          target: "video-dlq",
+          type: "animatedEdge",
+          animated: true,
+          data: {
+            messageCount: 1,
+            colorVar: "--rabbitmq",
+            active: true,
+          },
+        });
+      }
+
+      return {
+        nodes: [...nodes, ...videoNodes],
+        edges: [...edges, ...videoEdges],
+        metrics,
+      };
     }
 
-    videoNodes.push({
-      id: "video-dlq",
-      type: "serviceNode",
-      position: videoNodePositions.dlq,
-      data: {
-        service: "bullmq",
-        label: "DLQ Graveyard",
-        status: videoSnapshot.dlqRenditions.size > 0 ? "error" : "idle",
-        opsPerSec: videoSnapshot.dlqRenditions.size,
-        queueDepth: videoSnapshot.dlqRenditions.size,
-        colorVar: "--rabbitmq",
-      },
-    });
+    const bankingSnapshot = createBankingGraphSnapshot(events);
+    const reviewQueueDepth = Math.max(
+      0,
+      bankingSnapshot.reviewJobsQueued - bankingSnapshot.reviewJobsCompleted,
+    );
+    const replicaNodeMessageCount = Math.ceil(
+      bankingSnapshot.replicaWrites / 3,
+    );
 
-    const videoEdges: Edge<AnimatedEdgeData, "animatedEdge">[] = [
+    const bankingNodes: Node<ServiceNodeData, "serviceNode">[] = [
       {
-        id: "bullmq->video-parent",
-        source: "bullmq",
-        target: "video-parent",
-        type: "animatedEdge",
-        animated: videoSnapshot.parentCreated > 0,
+        id: "banking-idempotency",
+        type: "serviceNode",
+        position: bankingNodePositions.idempotency,
         data: {
-          messageCount: videoSnapshot.parentCreated,
+          service: "redis",
+          label: `Idempotency ${bankingSnapshot.duplicateBounces}`,
+          status:
+            bankingSnapshot.idempotencySetAttempts > 0 ? "active" : "idle",
+          opsPerSec: bankingSnapshot.idempotencySetAttempts,
+          queueDepth: bankingSnapshot.duplicateBounces,
+          colorVar: "--redis",
+        },
+      },
+      {
+        id: "banking-transaction",
+        type: "serviceNode",
+        position: bankingNodePositions.transaction,
+        data: {
+          service: "postgres",
+          label: `SERIALIZABLE TX ${bankingSnapshot.txCommits}`,
+          status: bankingSnapshot.txBegins > 0 ? "active" : "idle",
+          opsPerSec: bankingSnapshot.txBegins,
+          queueDepth: Math.max(
+            0,
+            bankingSnapshot.txBegins - bankingSnapshot.txCommits,
+          ),
+          colorVar: "--postgres",
+        },
+      },
+      {
+        id: "banking-review",
+        type: "serviceNode",
+        position: bankingNodePositions.review,
+        data: {
+          service: "bullmq",
+          label:
+            bankingSnapshot.latestReviewCountdownSec === null
+              ? "Review Hold Queue"
+              : `Review ${bankingSnapshot.latestReviewCountdownSec}s`,
+          status: bankingSnapshot.reviewJobsQueued > 0 ? "active" : "idle",
+          opsPerSec: bankingSnapshot.reviewJobsCompleted,
+          queueDepth: reviewQueueDepth,
           colorVar: "--bullmq",
-          active: videoSnapshot.parentCreated > 0,
+        },
+      },
+      {
+        id: "banking-confirm",
+        type: "serviceNode",
+        position: bankingNodePositions.confirm,
+        data: {
+          service: "rabbitmq",
+          label: `Confirm ACK ${bankingSnapshot.publisherConfirmAcks}`,
+          status: bankingSnapshot.publisherConfirmAcks > 0 ? "active" : "idle",
+          opsPerSec: bankingSnapshot.publisherConfirmAcks,
+          queueDepth: 0,
+          colorVar: "--rabbitmq",
+        },
+      },
+      {
+        id: "banking-replica-1",
+        type: "serviceNode",
+        position: bankingNodePositions["replica-1"],
+        data: {
+          service: "kafka",
+          label: "Replica A",
+          status: bankingSnapshot.replicaWrites > 0 ? "active" : "idle",
+          opsPerSec: replicaNodeMessageCount,
+          queueDepth: 0,
+          colorVar: "--kafka",
+        },
+      },
+      {
+        id: "banking-replica-2",
+        type: "serviceNode",
+        position: bankingNodePositions["replica-2"],
+        data: {
+          service: "kafka",
+          label: "Replica B",
+          status: bankingSnapshot.replicaWrites > 0 ? "active" : "idle",
+          opsPerSec: replicaNodeMessageCount,
+          queueDepth: 0,
+          colorVar: "--kafka",
+        },
+      },
+      {
+        id: "banking-replica-3",
+        type: "serviceNode",
+        position: bankingNodePositions["replica-3"],
+        data: {
+          service: "kafka",
+          label: "Replica C",
+          status: bankingSnapshot.replicaWrites > 0 ? "active" : "idle",
+          opsPerSec: replicaNodeMessageCount,
+          queueDepth: 0,
+          colorVar: "--kafka",
         },
       },
     ];
 
-    for (const rendition of videoRenditions) {
-      const createdCount = videoSnapshot.childCreatedByRendition[rendition];
-
-      videoEdges.push({
-        id: `video-parent->video-child-${rendition}`,
-        source: "video-parent",
-        target: `video-child-${rendition}`,
+    const bankingEdges: Edge<AnimatedEdgeData, "animatedEdge">[] = [
+      {
+        id: "redis->banking-idempotency",
+        source: "redis",
+        target: "banking-idempotency",
         type: "animatedEdge",
-        animated: createdCount > 0,
+        animated: bankingSnapshot.idempotencySetAttempts > 0,
         data: {
-          messageCount: createdCount,
-          colorVar: "--bullmq",
-          active: createdCount > 0,
+          messageCount: bankingSnapshot.idempotencySetAttempts,
+          colorVar: "--redis",
+          active: bankingSnapshot.idempotencySetAttempts > 0,
         },
-      });
-
-      if (!videoSnapshot.dlqRenditions.has(rendition)) {
-        continue;
-      }
-
-      videoEdges.push({
-        id: `video-child-${rendition}->video-dlq`,
-        source: `video-child-${rendition}`,
-        target: "video-dlq",
+      },
+      {
+        id: "banking-idempotency->elysia",
+        source: "banking-idempotency",
+        target: "elysia",
         type: "animatedEdge",
-        animated: true,
+        animated: bankingSnapshot.duplicateBounces > 0,
         data: {
-          messageCount: 1,
+          messageCount: bankingSnapshot.duplicateBounces,
+          colorVar: "--redis",
+          active: bankingSnapshot.duplicateBounces > 0,
+        },
+      },
+      {
+        id: "elysia->banking-transaction",
+        source: "elysia",
+        target: "banking-transaction",
+        type: "animatedEdge",
+        animated: bankingSnapshot.txBegins > 0,
+        data: {
+          messageCount: bankingSnapshot.txBegins,
+          colorVar: "--main",
+          active: bankingSnapshot.txBegins > 0,
+        },
+      },
+      {
+        id: "banking-transaction->postgres",
+        source: "banking-transaction",
+        target: "postgres",
+        type: "animatedEdge",
+        animated: bankingSnapshot.txCommits > 0,
+        data: {
+          messageCount: bankingSnapshot.txCommits,
+          colorVar: "--postgres",
+          active: bankingSnapshot.txCommits > 0,
+        },
+      },
+      {
+        id: "rabbitmq->banking-confirm",
+        source: "rabbitmq",
+        target: "banking-confirm",
+        type: "animatedEdge",
+        animated: bankingSnapshot.publisherConfirmAcks > 0,
+        data: {
+          messageCount: bankingSnapshot.publisherConfirmAcks,
           colorVar: "--rabbitmq",
-          active: true,
+          active: bankingSnapshot.publisherConfirmAcks > 0,
         },
-      });
-    }
+      },
+      {
+        id: "banking-confirm->elysia",
+        source: "banking-confirm",
+        target: "elysia",
+        type: "animatedEdge",
+        animated: bankingSnapshot.publisherConfirmAcks > 0,
+        data: {
+          messageCount: bankingSnapshot.publisherConfirmAcks,
+          colorVar: "--rabbitmq",
+          active: bankingSnapshot.publisherConfirmAcks > 0,
+        },
+      },
+      {
+        id: "bullmq->banking-review",
+        source: "bullmq",
+        target: "banking-review",
+        type: "animatedEdge",
+        animated: bankingSnapshot.reviewJobsQueued > 0,
+        data: {
+          messageCount: bankingSnapshot.reviewJobsQueued,
+          colorVar: "--bullmq",
+          active: bankingSnapshot.reviewJobsQueued > 0,
+        },
+      },
+      {
+        id: "kafka->banking-replica-1",
+        source: "kafka",
+        target: "banking-replica-1",
+        type: "animatedEdge",
+        animated: bankingSnapshot.replicaWrites > 0,
+        data: {
+          messageCount: replicaNodeMessageCount,
+          colorVar: "--kafka",
+          active: bankingSnapshot.replicaWrites > 0,
+        },
+      },
+      {
+        id: "kafka->banking-replica-2",
+        source: "kafka",
+        target: "banking-replica-2",
+        type: "animatedEdge",
+        animated: bankingSnapshot.replicaWrites > 0,
+        data: {
+          messageCount: replicaNodeMessageCount,
+          colorVar: "--kafka",
+          active: bankingSnapshot.replicaWrites > 0,
+        },
+      },
+      {
+        id: "kafka->banking-replica-3",
+        source: "kafka",
+        target: "banking-replica-3",
+        type: "animatedEdge",
+        animated: bankingSnapshot.replicaWrites > 0,
+        data: {
+          messageCount: replicaNodeMessageCount,
+          colorVar: "--kafka",
+          active: bankingSnapshot.replicaWrites > 0,
+        },
+      },
+    ];
 
     return {
-      nodes: [...nodes, ...videoNodes],
-      edges: [...edges, ...videoEdges],
+      nodes: [...nodes, ...bankingNodes],
+      edges: [...edges, ...bankingEdges],
       metrics,
     };
   }, [events, scenarioId]);

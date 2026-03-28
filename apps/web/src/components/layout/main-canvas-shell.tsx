@@ -61,6 +61,19 @@ type VideoOverlaySnapshot = {
   consumerStats: VideoConsumerStat[];
 };
 
+type BankingOverlaySnapshot = {
+  idempotencySetAttempts: number;
+  duplicateBounces: number;
+  txBegins: number;
+  txCommits: number;
+  publisherConfirmAcks: number;
+  reviewQueued: number;
+  reviewCompleted: number;
+  latestReviewCountdownSec: number | null;
+  replicaWrites: number;
+  auditReads: number;
+};
+
 function isVideoRendition(value: string): value is VideoRendition {
   return videoRenditions.includes(value as VideoRendition);
 }
@@ -413,6 +426,202 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
   );
 }
 
+function buildBankingOverlaySnapshot(
+  events: SimulationEvent[],
+): BankingOverlaySnapshot {
+  let idempotencySetAttempts = 0;
+  let duplicateBounces = 0;
+  let txBegins = 0;
+  let txCommits = 0;
+  let publisherConfirmAcks = 0;
+  let reviewQueued = 0;
+  let reviewCompleted = 0;
+  let latestReviewCountdownSec: number | null = null;
+  let replicaWrites = 0;
+  let auditReads = 0;
+
+  for (const event of events) {
+    if (event.kind === "redis.op") {
+      if (
+        event.data.operation === "SETNX" &&
+        typeof event.data.key === "string" &&
+        event.data.key.startsWith("banking:idempotency:")
+      ) {
+        idempotencySetAttempts += 1;
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "request.rejected" &&
+      event.data.reason === "duplicate_request"
+    ) {
+      duplicateBounces += 1;
+      continue;
+    }
+
+    if (event.kind === "postgres.tx.begin") {
+      if (typeof event.data.transferId === "string") {
+        txBegins += 1;
+      }
+      continue;
+    }
+
+    if (event.kind === "postgres.tx.commit") {
+      if (typeof event.data.transferId === "string") {
+        txCommits += 1;
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "rabbitmq.ack" &&
+      event.data.ackType === "publisher_confirm"
+    ) {
+      publisherConfirmAcks += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.created" &&
+      event.data.workflow === "banking-review"
+    ) {
+      reviewQueued += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.completed" &&
+      event.data.workflow === "banking-review"
+    ) {
+      reviewCompleted += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.progress" &&
+      event.data.workflow === "banking-review" &&
+      event.data.step === "review_hold" &&
+      typeof event.data.timeRemainingSec === "number"
+    ) {
+      latestReviewCountdownSec = event.data.timeRemainingSec;
+      continue;
+    }
+
+    if (event.kind === "kafka.produced") {
+      const detail = event.data.detail;
+      if (
+        typeof detail === "string" &&
+        detail.startsWith("replica.sync.node_")
+      ) {
+        replicaWrites += 1;
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "postgres.query" &&
+      event.data.query === "read_banking_audit_ledger"
+    ) {
+      auditReads += 1;
+    }
+  }
+
+  return {
+    idempotencySetAttempts,
+    duplicateBounces,
+    txBegins,
+    txCommits,
+    publisherConfirmAcks,
+    reviewQueued,
+    reviewCompleted,
+    latestReviewCountdownSec,
+    replicaWrites,
+    auditReads,
+  };
+}
+
+function BankingOverlay({ events }: { events: SimulationEvent[] }) {
+  const snapshot = useMemo(() => buildBankingOverlaySnapshot(events), [events]);
+
+  const inFlightTransactions = Math.max(
+    0,
+    snapshot.txBegins - snapshot.txCommits,
+  );
+  const reviewDepth = Math.max(
+    0,
+    snapshot.reviewQueued - snapshot.reviewCompleted,
+  );
+  const replicaPerNode = Math.ceil(snapshot.replicaWrites / 3);
+
+  return (
+    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 lg:grid-cols-[1.2fr,1fr,1fr]">
+      <article className="neo-panel bg-[var(--background)] p-2">
+        <p className="text-[11px] font-black uppercase tracking-wide">
+          Idempotency + Serializable Gate
+        </p>
+        <p className="mt-1 text-xs font-semibold">
+          SETNX attempts: {snapshot.idempotencySetAttempts}
+        </p>
+        <p className="text-xs font-semibold">
+          Duplicate bounces: {snapshot.duplicateBounces}
+        </p>
+        <p className="text-xs font-semibold">TX begin: {snapshot.txBegins}</p>
+        <p className="text-xs font-semibold">TX commit: {snapshot.txCommits}</p>
+        <p className="mt-1 text-xs font-black uppercase tracking-wide">
+          In-flight transaction blocks: {inFlightTransactions}
+        </p>
+      </article>
+
+      <article className="neo-panel bg-[var(--background)] p-2">
+        <p className="text-[11px] font-black uppercase tracking-wide">
+          Fraud Hold Review Queue
+        </p>
+        <p className="mt-1 text-xs font-semibold">
+          Publisher confirms: {snapshot.publisherConfirmAcks}
+        </p>
+        <p className="text-xs font-semibold">
+          Queued reviews: {snapshot.reviewQueued}
+        </p>
+        <p className="text-xs font-semibold">
+          Completed reviews: {snapshot.reviewCompleted}
+        </p>
+        <p className="text-xs font-semibold">Queue depth: {reviewDepth}</p>
+        <p className="mt-1 text-xs font-black uppercase tracking-wide">
+          Countdown: {snapshot.latestReviewCountdownSec ?? "-"}
+          {snapshot.latestReviewCountdownSec === null ? "" : "s"}
+        </p>
+      </article>
+
+      <article className="neo-panel bg-[var(--background)] p-2">
+        <p className="text-[11px] font-black uppercase tracking-wide">
+          Kafka Replication + Audit
+        </p>
+        <p className="mt-1 text-xs font-semibold">
+          Replica writes: {snapshot.replicaWrites}
+        </p>
+        <p className="text-xs font-semibold">
+          Per replica node: {replicaPerNode}
+        </p>
+        <p className="text-xs font-semibold">
+          Audit reads: {snapshot.auditReads}
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-1">
+          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+            R1
+          </div>
+          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+            R2
+          </div>
+          <div className="neo-panel bg-[var(--kafka)]/30 p-1 text-center text-[10px] font-black uppercase">
+            R3
+          </div>
+        </div>
+      </article>
+    </section>
+  );
+}
+
 export function MainCanvasShell({
   scenarioId,
 }: {
@@ -552,6 +761,8 @@ export function MainCanvasShell({
         {scenarioId === "video-pipeline" ? (
           <VideoPipelineOverlay events={events} />
         ) : null}
+
+        {scenarioId === "banking" ? <BankingOverlay events={events} /> : null}
 
         <div
           className={`relative z-10 mt-4 ${whatIfEnabled ? "what-if-failure" : ""}`}
