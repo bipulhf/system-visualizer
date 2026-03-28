@@ -9,6 +9,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { ReactNode } from "react";
 import { Sidebar } from "~/components/layout/sidebar";
 import { TopNav } from "~/components/layout/top-nav";
+import { SimulationUiProvider } from "~/lib/simulation-ui-context";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -36,13 +37,15 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <div className="min-h-dvh pb-6">
-          <TopNav />
-          <main className="mx-3 mt-3 grid gap-3 md:mx-6 md:grid-cols-[280px,1fr]">
-            <Sidebar />
-            <section>{children}</section>
-          </main>
-        </div>
+        <SimulationUiProvider>
+          <div className="min-h-dvh pb-6">
+            <TopNav />
+            <main className="mx-3 mt-3 grid gap-3 md:mx-6 md:grid-cols-[300px,1fr]">
+              <Sidebar />
+              <section>{children}</section>
+            </main>
+          </div>
+        </SimulationUiProvider>
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />
       </body>

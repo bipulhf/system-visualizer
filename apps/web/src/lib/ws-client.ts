@@ -17,6 +17,11 @@ type SimulationSocketHandlers = {
   onEvent: (event: SimulationEvent) => void;
 };
 
+type SimulationCommand = {
+  command: "jump_phase";
+  phase: number;
+};
+
 type RawSimulationEvent = {
   id?: string;
   timestamp?: number;
@@ -98,6 +103,7 @@ function parseSimulationEvent(payload: string): SimulationEvent | null {
 export function createSimulationWebSocket(handlers: SimulationSocketHandlers): {
   connect: () => void;
   disconnect: () => void;
+  jumpToPhase: (phase: number) => void;
 } {
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -156,8 +162,23 @@ export function createSimulationWebSocket(handlers: SimulationSocketHandlers): {
     socket = null;
   };
 
+  const jumpToPhase = (phase: number): void => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const safePhase = Math.min(4, Math.max(1, Math.trunc(phase)));
+    const command: SimulationCommand = {
+      command: "jump_phase",
+      phase: safePhase,
+    };
+
+    socket.send(JSON.stringify(command));
+  };
+
   return {
     connect,
     disconnect,
+    jumpToPhase,
   };
 }

@@ -418,39 +418,41 @@ interface SimulationEvent {
 
 **Goal:** All educational UX components built and wired up.
 
-- [ ] **Phase Stepper** (`phase-stepper.tsx`)
+**Status:** Completed
+
+- [x] **Phase Stepper** (`phase-stepper.tsx`)
   - Vertical timeline in sidebar
   - Steps: number + title + short description
   - Current phase highlighted with animation
   - Click to jump to phase (sends command to backend)
   - Auto-advances as simulation progresses
 
-- [ ] **"Why This Tech?" Tooltip** (`why-tooltip.tsx`)
+- [x] **"Why This Tech?" Tooltip** (`why-tooltip.tsx`)
   - Hover/click a service node → shadcn HoverCard pops up
   - Content: "Why [tech]?", comparison with naive alternative, key metric
   - Neobrutalism styled card with service accent color border
 
-- [ ] **Concept Cards** (`concept-card.tsx`)
+- [x] **Concept Cards** (`concept-card.tsx`)
   - Triggered by specific events (e.g., first DLQ event → "Dead Letter Queue" card)
   - Animated slide-in from right
   - Title, 2-3 sentence explanation, small diagram/icon
   - Dismiss or auto-hide after 8s
   - Never show the same concept twice per session
 
-- [ ] **"What If?" Toggle** (`what-if-toggle.tsx`)
+- [x] **"What If?" Toggle** (`what-if-toggle.tsx`)
   - Toggle switch per scenario: "What if we didn't use [tech]?"
   - Activates failure mode visualization:
     - Node turns red with shake animation
     - Counter shows failures (oversold items, lost messages, etc.)
     - Brief explanation of what went wrong
 
-- [ ] **Event Log** (`event-feed.tsx`)
+- [x] **Event Log** (`event-feed.tsx`)
   - Scrolling feed with newest on top
   - Each entry: timestamp, service color dot, description
   - Expandable: shows raw data, latency, and "Learn More" text
   - Filter buttons by service (toggle pills with service colors)
 
-- [ ] **Activity Monitor** (`activity-bar.tsx`)
+- [x] **Activity Monitor** (`activity-bar.tsx`)
   - Horizontal bar below flow graph
   - One mini card per active service showing:
     - Operations/sec (live counter)
@@ -459,12 +461,12 @@ interface SimulationEvent {
     - Error/retry count
   - Sparkline charts for throughput over time
 
-- [ ] **Speed Control** (`speed-slider.tsx`)
+- [x] **Speed Control** (`speed-slider.tsx`)
   - Slider: 0.25x, 0.5x, 1x, 2x, 4x
   - Pause button (freezes animation + event log, backend buffers events)
   - Step button (advance one event at a time when paused)
 
-- [ ] **Learning Content Data** (`learning-content.ts`)
+- [x] **Learning Content Data** (`learning-content.ts`)
   - All tooltip text, concept card content, "what if" descriptions
   - Organized by scenario and service
   - Written in clear, jargon-light language

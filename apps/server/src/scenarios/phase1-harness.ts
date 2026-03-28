@@ -13,11 +13,12 @@ let loopHandle: ReturnType<typeof setInterval> | null = null;
 let currentSequence = 0;
 let currentPhase = 0;
 let busy = false;
+let forcedPhase: number | null = null;
 
-function getContext(sequence: number): SimulationContext {
+function getContext(sequence: number, phase: number): SimulationContext {
   return {
     scenario: scenarioName,
-    phase: ((sequence - 1) % 4) + 1,
+    phase,
     requestId: `req-${sequence}`,
   };
 }
@@ -31,7 +32,10 @@ async function runLoopTick(): Promise<void> {
 
   try {
     currentSequence += 1;
-    const context = getContext(currentSequence);
+    const defaultPhase = ((currentSequence - 1) % 4) + 1;
+    const phase = forcedPhase ?? defaultPhase;
+    forcedPhase = null;
+    const context = getContext(currentSequence, phase);
 
     if (context.phase !== currentPhase) {
       currentPhase = context.phase;
@@ -117,6 +121,7 @@ export async function startPhaseOneHarness(): Promise<void> {
   running = true;
   currentSequence = 0;
   currentPhase = 0;
+  forcedPhase = null;
 
   await setRedisValue("stock:item_42", "100", {
     scenario: scenarioName,
@@ -141,4 +146,12 @@ export async function stopPhaseOneHarness(): Promise<void> {
 
 export function isPhaseOneHarnessRunning(): boolean {
   return running;
+}
+
+export function setPhaseOneHarnessPhase(phase: number): void {
+  if (phase < 1 || phase > 4) {
+    return;
+  }
+
+  forcedPhase = phase;
 }

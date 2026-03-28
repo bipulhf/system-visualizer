@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { onSimulationEvent } from "./events/emitter";
 import {
   isPhaseOneHarnessRunning,
+  setPhaseOneHarnessPhase,
   startPhaseOneHarness,
   stopPhaseOneHarness,
 } from "./scenarios/phase1-harness";
@@ -79,6 +80,11 @@ async function getServiceHealth(): Promise<HealthResponse> {
 
 let simulationClientCount = 0;
 
+type SimulationCommand = {
+  command?: string;
+  phase?: number;
+};
+
 const app = new Elysia()
   .get("/health", async () => {
     const result = await getServiceHealth();
@@ -105,6 +111,35 @@ const app = new Elysia()
 
       if (simulationClientCount === 0) {
         void stopPhaseOneHarness();
+      }
+    },
+    message(_, message) {
+      if (typeof message !== "string") {
+        return;
+      }
+
+      try {
+        const command = JSON.parse(message) as SimulationCommand;
+        if (command.command !== "jump_phase") {
+          return;
+        }
+
+        if (typeof command.phase !== "number") {
+          return;
+        }
+
+        const phase = Math.trunc(command.phase);
+        if (phase < 1 || phase > 4) {
+          return;
+        }
+
+        if (!isPhaseOneHarnessRunning()) {
+          void startPhaseOneHarness();
+        }
+
+        setPhaseOneHarnessPhase(phase);
+      } catch {
+        return;
       }
     },
   })

@@ -90,3 +90,21 @@
   );
   box-shadow: none;
 }
+
+@keyframes phase2-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@utility what-if-failure {
+  border-color: oklch(60% 0.25 25);
+  animation: phase2-shake 0.42s ease-in-out infinite;
+}
