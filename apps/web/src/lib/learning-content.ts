@@ -1,6 +1,9 @@
 import type { EventKind, ServiceName } from "~/lib/event-types";
 
-export type SupportedScenarioId = "flash-sale" | "ride-sharing";
+export type SupportedScenarioId =
+  | "flash-sale"
+  | "ride-sharing"
+  | "video-pipeline";
 
 export type ScenarioInfo = {
   title: string;
@@ -57,6 +60,13 @@ export const scenarioInfoById: Record<SupportedScenarioId, ScenarioInfo> = {
       "Match passengers with nearby drivers while keeping dispatch latency predictable.",
     problem:
       "Drivers move constantly and each ride request must find, lock, and confirm one driver quickly.",
+  },
+  "video-pipeline": {
+    title: "Video Transcoding Pipeline",
+    tagline:
+      "Coordinate parent-child jobs, failure isolation, and publish readiness fan-out.",
+    problem:
+      "Each upload must fan out into multiple renditions while surviving partial failure and preserving final consistency.",
   },
 };
 
@@ -381,6 +391,170 @@ export const scenarioLearningContent: Record<
         failureMode: "No durable completion ledger",
         explanation:
           "If final trip state is not persisted transactionally, billing and reconciliation drift.",
+      },
+    },
+  },
+  "video-pipeline": {
+    phases: [
+      {
+        id: 1,
+        title: "Upload Intake",
+        description:
+          "An upload is admitted and persisted before orchestration begins.",
+        services: ["elysia", "postgres", "bullmq"],
+      },
+      {
+        id: 2,
+        title: "Child Transcodes",
+        description:
+          "Parent and child jobs execute in parallel while progress is tracked in Redis.",
+        services: ["bullmq", "redis"],
+      },
+      {
+        id: 3,
+        title: "Failure Isolation",
+        description:
+          "A failing rendition retries, then moves to DLQ without blocking healthy renditions.",
+        services: ["bullmq", "redis"],
+      },
+      {
+        id: 4,
+        title: "Publish Routing",
+        description:
+          "Completion events route to downstream services and stream into Kafka.",
+        services: ["rabbitmq", "kafka"],
+      },
+      {
+        id: 5,
+        title: "Finalize & Cleanup",
+        description:
+          "Final state commits to PostgreSQL and transient Redis progress keys are cleared.",
+        services: ["postgres", "redis"],
+      },
+    ],
+    whyTechByService: {
+      elysia: {
+        service: "elysia",
+        title: "Elysia for Upload Admission",
+        reason:
+          "A lightweight edge API accepts uploads quickly and hands work to background systems.",
+        comparison:
+          "Synchronous upload-to-transcode handlers inflate response time and cause client retries.",
+        keyMetric: "Low-overhead request intake before async orchestration",
+      },
+      redis: {
+        service: "redis",
+        title: "Redis for Live Progress State",
+        reason:
+          "Progress values with TTL provide fresh worker state while automatically expiring stale entries.",
+        comparison:
+          "Persistent tables for high-frequency progress updates increase write amplification and cleanup cost.",
+        keyMetric:
+          "Low-latency progress writes with TTL-based automatic expiry",
+      },
+      bullmq: {
+        service: "bullmq",
+        title: "BullMQ Parent-Child Orchestration",
+        reason:
+          "Parent and child job modeling keeps parallel transcoding explicit, retryable, and observable.",
+        comparison:
+          "Ad-hoc async workers make dependency tracking and targeted retries hard to reason about.",
+        keyMetric: "Parallel child execution with bounded retries and DLQ path",
+      },
+      rabbitmq: {
+        service: "rabbitmq",
+        title: "RabbitMQ Topic Routing Keys",
+        reason:
+          "Routing keys fan out readiness events only to interested downstream consumers.",
+        comparison:
+          "Broadcasting all events to every consumer wastes compute and increases coupling.",
+        keyMetric: "Selective multi-queue fan-out by routing key",
+      },
+      kafka: {
+        service: "kafka",
+        title: "Kafka for Publish Timeline",
+        reason:
+          "A durable event stream captures publish lifecycle and supports independent replay by multiple teams.",
+        comparison:
+          "Single destination notifications cannot be replayed reliably for new consumers.",
+        keyMetric: "Immutable publish event log across multiple consumer groups",
+      },
+      postgres: {
+        service: "postgres",
+        title: "PostgreSQL for Final Asset Ledger",
+        reason:
+          "Finalized rendition counts and publish status require transactional durability for reconciliation.",
+        comparison:
+          "Keeping final state only in queues and cache makes billing and audit reconciliation fragile.",
+        keyMetric: "Transactional finalization of durable asset state",
+      },
+    },
+    conceptDefinitions: [
+      {
+        id: "parent-child-jobs",
+        title: "Parent/Child Jobs",
+        description:
+          "A parent tracks orchestration while child jobs run independent transcode tasks in parallel.",
+        triggerKinds: ["bullmq.job.created", "bullmq.job.processing"],
+      },
+      {
+        id: "dead-letter-queue-video",
+        title: "Dead Letter Queue",
+        description:
+          "After retries are exhausted, failed children move aside so healthy work can continue.",
+        triggerKinds: ["bullmq.job.failed", "bullmq.job.dlq"],
+      },
+      {
+        id: "routing-keys",
+        title: "Routing Keys",
+        description:
+          "Topic routing keys send one publish event to exactly the queues that need it.",
+        triggerKinds: ["rabbitmq.published", "rabbitmq.routed"],
+      },
+      {
+        id: "partial-availability",
+        title: "Partial Availability",
+        description:
+          "A system can still deliver value even when one rendition fails, as long as failures are isolated.",
+        triggerKinds: ["scenario.complete", "postgres.tx.commit"],
+      },
+    ],
+    whatIfByService: {
+      elysia: {
+        service: "elysia",
+        failureMode: "Slow upload admission",
+        explanation:
+          "Without a fast intake boundary, uploads queue at the edge and user retries multiply pressure.",
+      },
+      redis: {
+        service: "redis",
+        failureMode: "Stale progress state",
+        explanation:
+          "Without TTL-backed progress keys, dashboards display stale values and operators lose confidence.",
+      },
+      bullmq: {
+        service: "bullmq",
+        failureMode: "Opaque orchestration",
+        explanation:
+          "Without parent-child queues, retry policy and failure isolation become ad-hoc and fragile.",
+      },
+      rabbitmq: {
+        service: "rabbitmq",
+        failureMode: "Over-broadcasted events",
+        explanation:
+          "Without routing keys, unrelated services process irrelevant publish events and waste capacity.",
+      },
+      kafka: {
+        service: "kafka",
+        failureMode: "No replayable publish history",
+        explanation:
+          "Without a durable stream, late-joining analytics cannot reconstruct publication outcomes.",
+      },
+      postgres: {
+        service: "postgres",
+        failureMode: "Missing final source of truth",
+        explanation:
+          "Without final transactional writes, reporting and reconciliation drift from actual pipeline outcomes.",
       },
     },
   },

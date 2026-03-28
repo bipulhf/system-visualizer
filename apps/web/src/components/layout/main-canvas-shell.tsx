@@ -40,6 +40,31 @@ type RideOverlaySnapshot = {
   latestAttempt: number | null;
 };
 
+const videoRenditions = ["240p", "360p", "720p", "1080p", "4k"] as const;
+type VideoRendition = (typeof videoRenditions)[number];
+
+type VideoConsumerStat = {
+  consumerGroup: string;
+  consumedCount: number;
+  averageLatencyMs: number;
+};
+
+type VideoRoutingPath = {
+  routingKey: string;
+  queue: string;
+};
+
+type VideoOverlaySnapshot = {
+  progressByRendition: Record<VideoRendition, number>;
+  dlqRenditions: VideoRendition[];
+  routingPaths: VideoRoutingPath[];
+  consumerStats: VideoConsumerStat[];
+};
+
+function isVideoRendition(value: string): value is VideoRendition {
+  return videoRenditions.includes(value as VideoRendition);
+}
+
 function buildRideOverlaySnapshot(
   events: SimulationEvent[],
 ): RideOverlaySnapshot {
@@ -201,6 +226,186 @@ function RideSharingOverlay({ events }: { events: SimulationEvent[] }) {
   );
 }
 
+function buildVideoPipelineOverlaySnapshot(
+  events: SimulationEvent[],
+): VideoOverlaySnapshot {
+  const progressByRendition: Record<VideoRendition, number> = {
+    "240p": 0,
+    "360p": 0,
+    "720p": 0,
+    "1080p": 0,
+    "4k": 0,
+  };
+
+  const dlqRenditions = new Set<VideoRendition>();
+  const routingPathMap = new Map<string, VideoRoutingPath>();
+  const consumerStats = new Map<
+    string,
+    { consumedCount: number; latencyTotal: number }
+  >();
+
+  for (const event of events) {
+    const workflow = event.data.workflow;
+    const renditionRaw = event.data.rendition;
+    const rendition =
+      typeof renditionRaw === "string" && isVideoRendition(renditionRaw)
+        ? renditionRaw
+        : null;
+
+    if (
+      event.kind === "bullmq.job.progress" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      const progress = event.data.progress;
+      if (typeof progress === "number") {
+        progressByRendition[rendition] = Math.max(
+          progressByRendition[rendition],
+          Math.trunc(progress),
+        );
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.completed" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      progressByRendition[rendition] = 100;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.dlq" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      dlqRenditions.add(rendition);
+      continue;
+    }
+
+    if (event.kind === "rabbitmq.routed") {
+      const routingKey = event.data.routingKey;
+      const queue = event.data.queue;
+      if (typeof routingKey === "string" && typeof queue === "string") {
+        routingPathMap.set(routingKey, {
+          routingKey,
+          queue,
+        });
+      }
+      continue;
+    }
+
+    if (event.kind === "kafka.consumed") {
+      const consumerGroup = event.data.consumerGroup;
+      if (typeof consumerGroup !== "string") {
+        continue;
+      }
+
+      const previous = consumerStats.get(consumerGroup) ?? {
+        consumedCount: 0,
+        latencyTotal: 0,
+      };
+
+      consumerStats.set(consumerGroup, {
+        consumedCount: previous.consumedCount + 1,
+        latencyTotal: previous.latencyTotal + event.latencyMs,
+      });
+    }
+  }
+
+  return {
+    progressByRendition,
+    dlqRenditions: Array.from(dlqRenditions),
+    routingPaths: Array.from(routingPathMap.values()),
+    consumerStats: Array.from(consumerStats.entries())
+      .map(([consumerGroup, value]) => ({
+        consumerGroup,
+        consumedCount: value.consumedCount,
+        averageLatencyMs:
+          value.consumedCount > 0
+            ? Math.round(value.latencyTotal / value.consumedCount)
+            : 0,
+      }))
+      .sort((left, right) => left.averageLatencyMs - right.averageLatencyMs),
+  };
+}
+
+function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
+  const snapshot = useMemo(() => buildVideoPipelineOverlaySnapshot(events), [events]);
+
+  return (
+    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 lg:grid-cols-[1.4fr,1fr]">
+      <article className="neo-panel bg-[var(--background)] p-2">
+        <p className="text-[11px] font-black uppercase tracking-wide">
+          Parent-Child Rendition Progress
+        </p>
+        <div className="mt-2 space-y-2">
+          {videoRenditions.map((rendition) => {
+            const progress = snapshot.progressByRendition[rendition];
+            const inDlq = snapshot.dlqRenditions.includes(rendition);
+
+            return (
+              <div key={rendition} className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold uppercase">
+                  <span>{rendition}</span>
+                  <span>{inDlq ? "dlq" : `${progress}%`}</span>
+                </div>
+                <div className="h-2 overflow-hidden border-2 border-[var(--border)] bg-[var(--background)]">
+                  <div
+                    className={`${inDlq ? "bg-red-500" : "bg-[var(--bullmq)]"} h-full transition-[width] duration-200`}
+                    style={{ width: `${inDlq ? 100 : progress}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs font-black uppercase tracking-wide">
+          DLQ Graveyard: {snapshot.dlqRenditions.length > 0 ? snapshot.dlqRenditions.join(", ") : "none"}
+        </p>
+      </article>
+
+      <article className="grid gap-2">
+        <div className="neo-panel bg-[var(--background)] p-2">
+          <p className="text-[11px] font-black uppercase tracking-wide">
+            RabbitMQ Routing Keys
+          </p>
+          <div className="mt-2 space-y-1 text-xs">
+            {snapshot.routingPaths.length === 0 ? (
+              <p>Waiting for routing events</p>
+            ) : (
+              snapshot.routingPaths.map((path) => (
+                <p key={path.routingKey} className="font-semibold">
+                  {path.routingKey} -&gt; {path.queue}
+                </p>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="neo-panel bg-[var(--background)] p-2">
+          <p className="text-[11px] font-black uppercase tracking-wide">
+            Kafka Consumer Speeds
+          </p>
+          <div className="mt-2 space-y-1 text-xs">
+            {snapshot.consumerStats.length === 0 ? (
+              <p>Waiting for consumer activity</p>
+            ) : (
+              snapshot.consumerStats.map((entry) => (
+                <p key={entry.consumerGroup} className="font-semibold">
+                  {entry.consumerGroup}: {entry.consumedCount} events, {entry.averageLatencyMs}ms avg
+                </p>
+              ))
+            )}
+          </div>
+        </div>
+      </article>
+    </section>
+  );
+}
+
 export function MainCanvasShell({
   scenarioId,
 }: {
@@ -228,7 +433,7 @@ export function MainCanvasShell({
       stepCounter,
       scenarioId,
     });
-  const { nodes, edges, metrics } = useFlowState(events);
+  const { nodes, edges, metrics } = useFlowState(events, scenarioId);
   const [activeConcept, setActiveConcept] = useState<ConceptDefinition | null>(
     null,
   );
@@ -335,6 +540,10 @@ export function MainCanvasShell({
 
         {scenarioId === "ride-sharing" ? (
           <RideSharingOverlay events={events} />
+        ) : null}
+
+        {scenarioId === "video-pipeline" ? (
+          <VideoPipelineOverlay events={events} />
         ) : null}
 
         <div

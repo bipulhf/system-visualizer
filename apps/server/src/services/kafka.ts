@@ -8,7 +8,10 @@ const kafka = new Kafka({
   clientId: "visualizer-flash-sale-simulation",
 });
 
-export type KafkaTopicName = "flash-sale-events" | "trip-events";
+export type KafkaTopicName =
+  | "flash-sale-events"
+  | "trip-events"
+  | "video-pipeline-events";
 
 const defaultTopicName: KafkaTopicName = "flash-sale-events";
 
@@ -28,11 +31,17 @@ const topicConsumerConfigs: Record<
     { groupId: "ride-passenger-notify", delayMs: 120 },
     { groupId: "ride-billing", delayMs: 220 },
   ],
+  "video-pipeline-events": [
+    { groupId: "video-analytics", delayMs: 40 },
+    { groupId: "video-search-indexer", delayMs: 130 },
+    { groupId: "video-notifier", delayMs: 240 },
+  ],
 };
 
 const topicPartitions: Record<KafkaTopicName, number> = {
   "flash-sale-events": 3,
   "trip-events": 3,
+  "video-pipeline-events": 3,
 };
 
 type ConsumerRuntime = {
@@ -60,12 +69,22 @@ const topicConsumerRuntimes: Record<KafkaTopicName, ConsumerRuntime[]> = {
     delayMs: config.delayMs,
     topic: "trip-events",
   })),
+  "video-pipeline-events": topicConsumerConfigs["video-pipeline-events"].map(
+    (config) => ({
+      consumer: kafka.consumer({ groupId: config.groupId }),
+      connected: false,
+      groupId: config.groupId,
+      delayMs: config.delayMs,
+      topic: "video-pipeline-events",
+    }),
+  ),
 };
 
 let producerConnected = false;
 let topicEnsured: Record<KafkaTopicName, boolean> = {
   "flash-sale-events": false,
   "trip-events": false,
+  "video-pipeline-events": false,
 };
 
 type KafkaPayload = {
@@ -164,6 +183,7 @@ async function ensureKafkaRuntimeConnections(
 export async function checkKafkaConnection(): Promise<void> {
   await ensureKafkaRuntimeConnections("flash-sale-events");
   await ensureKafkaRuntimeConnections("trip-events");
+  await ensureKafkaRuntimeConnections("video-pipeline-events");
 }
 
 export async function produceKafkaEvent(
@@ -224,5 +244,6 @@ export async function closeKafkaConnection(): Promise<void> {
   topicEnsured = {
     "flash-sale-events": false,
     "trip-events": false,
+    "video-pipeline-events": false,
   };
 }

@@ -28,9 +28,41 @@ type RideDispatchJobData = {
   forceRetry: boolean;
 };
 
+type VideoParentJobData = {
+  scenario: string;
+  phase: number;
+  requestId: string;
+  workflow: "video-parent";
+  uploadId: string;
+  expectedChildCount: number;
+};
+
+type VideoChildJobData = {
+  scenario: string;
+  phase: number;
+  requestId: string;
+  workflow: "video-child";
+  uploadId: string;
+  parentRequestId: string;
+  parentJobId: string;
+  rendition: string;
+  shouldFail: boolean;
+  progressTtlSeconds: number;
+};
+
 type RideDispatchResult = {
   selectedDriverId: string;
   passengerId: string;
+};
+
+type VideoParentResult = {
+  uploadId: string;
+  expectedChildCount: number;
+};
+
+type VideoChildResult = {
+  rendition: string;
+  uploadId: string;
 };
 
 const redisConnection = {
@@ -42,6 +74,8 @@ const redisConnection = {
 
 const flashSaleQueueName = "visualizer-flash-sale-orders";
 const rideDispatchQueueName = "visualizer-ride-sharing-dispatch";
+const videoParentQueueName = "visualizer-video-pipeline-parent";
+const videoChildQueueName = "visualizer-video-pipeline-child";
 
 const flashSaleQueue = new Queue<FlashSaleJobData>(flashSaleQueueName, {
   connection: redisConnection,
@@ -54,16 +88,33 @@ const rideDispatchQueue = new Queue<RideDispatchJobData>(
   },
 );
 
+const videoParentQueue = new Queue<VideoParentJobData>(videoParentQueueName, {
+  connection: redisConnection,
+});
+
+const videoChildQueue = new Queue<VideoChildJobData>(videoChildQueueName, {
+  connection: redisConnection,
+});
+
 let flashSaleWorker: Worker<FlashSaleJobData> | null = null;
 let rideDispatchWorker: Worker<RideDispatchJobData, RideDispatchResult> | null =
   null;
+let videoParentWorker: Worker<VideoParentJobData, VideoParentResult> | null =
+  null;
+let videoChildWorker: Worker<VideoChildJobData, VideoChildResult> | null =
+  null;
 
 function emitBullMqEvent(
-  job: Job<FlashSaleJobData> | Job<RideDispatchJobData>,
+  job:
+    | Job<FlashSaleJobData>
+    | Job<RideDispatchJobData>
+    | Job<VideoParentJobData>
+    | Job<VideoChildJobData>,
   kind:
     | "bullmq.job.processing"
     | "bullmq.job.completed"
     | "bullmq.job.failed"
+    | "bullmq.job.dlq"
     | "bullmq.job.progress",
   description: string,
   data: EventData,
@@ -267,11 +318,230 @@ function ensureRideDispatchWorker(): void {
   });
 }
 
+function ensureVideoParentWorker(): void {
+  if (videoParentWorker) {
+    return;
+  }
+
+  videoParentWorker = new Worker<VideoParentJobData, VideoParentResult>(
+    videoParentQueueName,
+    async (job) => {
+      emitBullMqEvent(
+        job,
+        "bullmq.job.processing",
+        `Video parent started ${job.data.uploadId}`,
+        {
+          requestId: job.data.requestId,
+          parentRequestId: job.data.requestId,
+          uploadId: job.data.uploadId,
+          workflow: job.data.workflow,
+          expectedChildCount: job.data.expectedChildCount,
+          jobId: job.id ?? null,
+        },
+      );
+
+      await Bun.sleep(50);
+
+      emitBullMqEvent(
+        job,
+        "bullmq.job.progress",
+        `Parent prepared children for ${job.data.uploadId}`,
+        {
+          requestId: job.data.requestId,
+          parentRequestId: job.data.requestId,
+          uploadId: job.data.uploadId,
+          workflow: job.data.workflow,
+          progress: 100,
+          step: "parent_prepare",
+        },
+      );
+
+      return {
+        uploadId: job.data.uploadId,
+        expectedChildCount: job.data.expectedChildCount,
+      };
+    },
+    {
+      connection: redisConnection,
+      concurrency: 3,
+    },
+  );
+
+  videoParentWorker.on("completed", (job, result) => {
+    emitBullMqEvent(
+      job,
+      "bullmq.job.completed",
+      `Video parent completed ${result.uploadId}`,
+      {
+        requestId: job.data.requestId,
+        parentRequestId: job.data.requestId,
+        uploadId: result.uploadId,
+        workflow: job.data.workflow,
+        expectedChildCount: result.expectedChildCount,
+        jobId: job.id ?? null,
+      },
+    );
+  });
+
+  videoParentWorker.on("failed", (job, error) => {
+    if (!job) {
+      return;
+    }
+
+    emitBullMqEvent(
+      job,
+      "bullmq.job.failed",
+      `Video parent failed ${job.data.uploadId}`,
+      {
+        requestId: job.data.requestId,
+        parentRequestId: job.data.requestId,
+        uploadId: job.data.uploadId,
+        workflow: job.data.workflow,
+        reason: error.message,
+        attemptsMade: job.attemptsMade,
+        attemptsMax: job.opts.attempts ?? 1,
+        finalFailure: job.attemptsMade >= (job.opts.attempts ?? 1),
+      },
+    );
+  });
+}
+
+function ensureVideoChildWorker(): void {
+  if (videoChildWorker) {
+    return;
+  }
+
+  videoChildWorker = new Worker<VideoChildJobData, VideoChildResult>(
+    videoChildQueueName,
+    async (job) => {
+      emitBullMqEvent(
+        job,
+        "bullmq.job.processing",
+        `Video child started ${job.data.uploadId}:${job.data.rendition}`,
+        {
+          requestId: job.data.requestId,
+          parentRequestId: job.data.parentRequestId,
+          parentJobId: job.data.parentJobId,
+          uploadId: job.data.uploadId,
+          rendition: job.data.rendition,
+          workflow: job.data.workflow,
+          progressTtlSeconds: job.data.progressTtlSeconds,
+          jobId: job.id ?? null,
+          attemptsMade: job.attemptsMade,
+        },
+      );
+
+      const progressSteps = [20, 40, 60, 80, 100] as const;
+      for (const progress of progressSteps) {
+        await Bun.sleep(80);
+
+        emitBullMqEvent(
+          job,
+          "bullmq.job.progress",
+          `Transcode ${job.data.uploadId}:${job.data.rendition} ${progress}%`,
+          {
+            requestId: job.data.requestId,
+            parentRequestId: job.data.parentRequestId,
+            parentJobId: job.data.parentJobId,
+            uploadId: job.data.uploadId,
+            rendition: job.data.rendition,
+            workflow: job.data.workflow,
+            progress,
+            step: "transcode",
+            progressTtlSeconds: job.data.progressTtlSeconds,
+            attempt: job.attemptsMade + 1,
+          },
+        );
+      }
+
+      if (job.data.shouldFail) {
+        throw new Error(`transcode_failed:${job.data.rendition}`);
+      }
+
+      return {
+        rendition: job.data.rendition,
+        uploadId: job.data.uploadId,
+      };
+    },
+    {
+      connection: redisConnection,
+      concurrency: 8,
+    },
+  );
+
+  videoChildWorker.on("completed", (job, result) => {
+    emitBullMqEvent(
+      job,
+      "bullmq.job.completed",
+      `Video child completed ${result.uploadId}:${result.rendition}`,
+      {
+        requestId: job.data.requestId,
+        parentRequestId: job.data.parentRequestId,
+        parentJobId: job.data.parentJobId,
+        uploadId: result.uploadId,
+        rendition: result.rendition,
+        workflow: job.data.workflow,
+        attemptsMade: job.attemptsMade,
+        jobId: job.id ?? null,
+      },
+    );
+  });
+
+  videoChildWorker.on("failed", (job, error) => {
+    if (!job) {
+      return;
+    }
+
+    const finalFailure = job.attemptsMade >= (job.opts.attempts ?? 1);
+
+    emitBullMqEvent(
+      job,
+      "bullmq.job.failed",
+      `Video child failed ${job.data.uploadId}:${job.data.rendition}`,
+      {
+        requestId: job.data.requestId,
+        parentRequestId: job.data.parentRequestId,
+        parentJobId: job.data.parentJobId,
+        uploadId: job.data.uploadId,
+        rendition: job.data.rendition,
+        workflow: job.data.workflow,
+        reason: error.message,
+        attemptsMade: job.attemptsMade,
+        attemptsMax: job.opts.attempts ?? 1,
+        finalFailure,
+      },
+    );
+
+    if (!finalFailure) {
+      return;
+    }
+
+    emitBullMqEvent(
+      job,
+      "bullmq.job.dlq",
+      `Video child moved to DLQ ${job.data.uploadId}:${job.data.rendition}`,
+      {
+        requestId: job.data.requestId,
+        parentRequestId: job.data.parentRequestId,
+        parentJobId: job.data.parentJobId,
+        uploadId: job.data.uploadId,
+        rendition: job.data.rendition,
+        workflow: job.data.workflow,
+        reason: error.message,
+      },
+    );
+  });
+}
+
 export async function checkBullMqConnection(): Promise<void> {
   await flashSaleQueue.waitUntilReady();
   await rideDispatchQueue.waitUntilReady();
+  await videoParentQueue.waitUntilReady();
+  await videoChildQueue.waitUntilReady();
   ensureFlashSaleWorker();
   ensureRideDispatchWorker();
+  ensureVideoParentWorker();
+  ensureVideoChildWorker();
 }
 
 export async function enqueueBullMqJob(
@@ -392,6 +662,122 @@ export async function enqueueRideDispatchJob(
   return job.id ? String(job.id) : context.requestId;
 }
 
+export async function enqueueVideoPipelineParentJob(
+  context: SimulationContext,
+  options: {
+    uploadId: string;
+    expectedChildCount: number;
+  },
+): Promise<string> {
+  await videoParentQueue.waitUntilReady();
+  ensureVideoParentWorker();
+
+  const startedAt = performance.now();
+  const job = await videoParentQueue.add(
+    "video-parent",
+    {
+      scenario: context.scenario,
+      phase: context.phase,
+      requestId: context.requestId,
+      workflow: "video-parent",
+      uploadId: options.uploadId,
+      expectedChildCount: options.expectedChildCount,
+    },
+    {
+      removeOnComplete: 100,
+      removeOnFail: 100,
+      attempts: 1,
+    },
+  );
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "bullmq.job.created",
+    source: "bullmq",
+    target: "rabbitmq",
+    data: {
+      requestId: context.requestId,
+      parentRequestId: context.requestId,
+      parentJobId: job.id ?? null,
+      uploadId: options.uploadId,
+      workflow: "video-parent",
+      expectedChildCount: options.expectedChildCount,
+    },
+    latencyMs: Math.round(performance.now() - startedAt),
+    description: `BullMQ created video parent job ${job.id ?? "job"}`,
+  });
+
+  return job.id ? String(job.id) : context.requestId;
+}
+
+export async function enqueueVideoPipelineChildJob(
+  context: SimulationContext,
+  options: {
+    uploadId: string;
+    parentRequestId: string;
+    parentJobId: string;
+    rendition: string;
+    shouldFail: boolean;
+    attempts: number;
+    backoffDelayMs: number;
+    progressTtlSeconds: number;
+  },
+): Promise<string> {
+  await videoChildQueue.waitUntilReady();
+  ensureVideoChildWorker();
+
+  const startedAt = performance.now();
+  const job = await videoChildQueue.add(
+    "video-child",
+    {
+      scenario: context.scenario,
+      phase: context.phase,
+      requestId: context.requestId,
+      workflow: "video-child",
+      uploadId: options.uploadId,
+      parentRequestId: options.parentRequestId,
+      parentJobId: options.parentJobId,
+      rendition: options.rendition,
+      shouldFail: options.shouldFail,
+      progressTtlSeconds: options.progressTtlSeconds,
+    },
+    {
+      removeOnComplete: 100,
+      removeOnFail: 100,
+      attempts: options.attempts,
+      backoff: {
+        type: "exponential",
+        delay: options.backoffDelayMs,
+      },
+    },
+  );
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "bullmq.job.created",
+    source: "bullmq",
+    target: "rabbitmq",
+    data: {
+      requestId: context.requestId,
+      parentRequestId: options.parentRequestId,
+      parentJobId: options.parentJobId,
+      childJobId: job.id ?? null,
+      uploadId: options.uploadId,
+      rendition: options.rendition,
+      workflow: "video-child",
+      attempts: options.attempts,
+      shouldFail: options.shouldFail,
+      progressTtlSeconds: options.progressTtlSeconds,
+    },
+    latencyMs: Math.round(performance.now() - startedAt),
+    description: `BullMQ created video child job ${job.id ?? "job"}`,
+  });
+
+  return job.id ? String(job.id) : context.requestId;
+}
+
 export async function closeBullMqConnection(): Promise<void> {
   if (flashSaleWorker) {
     await flashSaleWorker.close();
@@ -403,6 +789,18 @@ export async function closeBullMqConnection(): Promise<void> {
     rideDispatchWorker = null;
   }
 
+  if (videoParentWorker) {
+    await videoParentWorker.close();
+    videoParentWorker = null;
+  }
+
+  if (videoChildWorker) {
+    await videoChildWorker.close();
+    videoChildWorker = null;
+  }
+
   await flashSaleQueue.close();
   await rideDispatchQueue.close();
+  await videoParentQueue.close();
+  await videoChildQueue.close();
 }

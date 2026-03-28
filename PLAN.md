@@ -576,26 +576,28 @@ interface SimulationEvent {
 
 ### Phase 5: Scenario 3 — Video Transcoding Pipeline (Days 20-23)
 
+**Status:** Completed
+
 #### Backend Simulation (`scenarios/video-pipeline.ts`)
 
-- [ ] Phase 1 — Upload intake, PostgreSQL insert, BullMQ parent job with 5 children
-- [ ] Phase 2 — Workers process child jobs with progress reporting (0-100%)
+- [x] Phase 1 — Upload intake, PostgreSQL insert, BullMQ parent job with 5 children
+- [x] Phase 2 — Workers process child jobs with progress reporting (0-100%)
   - Redis stores live progress per job with TTL
-- [ ] Phase 3 — Failure handling: one child fails 3x → DLQ
+- [x] Phase 3 — Failure handling: one child fails 3x → DLQ
   - Other children continue independently
-- [ ] Phase 4 — RabbitMQ routes completion to CDN/search/notification (routing keys)
+- [x] Phase 4 — RabbitMQ routes completion to CDN/search/notification (routing keys)
   - Kafka `video.published` event to consumer groups
-- [ ] Phase 5 — PostgreSQL final update, Redis TTL cleanup
+- [x] Phase 5 — PostgreSQL final update, Redis TTL cleanup
 
 #### Frontend Integration
 
-- [ ] @xyflow layout with parent/child job tree visualization
-- [ ] Progress bars on each child job node (animated 0→100%)
-- [ ] DLQ visualization — failed job moves to separate "graveyard" node
-- [ ] RabbitMQ routing keys visualized as labeled arrows
-- [ ] Kafka consumers processing at visibly different speeds
-- [ ] Learning content: parent/child flows, DLQ, progress tracking, routing keys, TTL cleanup
-- [ ] Concept cards: "Parent/Child Jobs", "Dead Letter Queue", "Routing Keys", "Partial Availability"
+- [x] @xyflow layout with parent/child job tree visualization
+- [x] Progress bars on each child job node (animated 0→100%)
+- [x] DLQ visualization — failed job moves to separate "graveyard" node
+- [x] RabbitMQ routing keys visualized as labeled arrows
+- [x] Kafka consumers processing at visibly different speeds
+- [x] Learning content: parent/child flows, DLQ, progress tracking, routing keys, TTL cleanup
+- [x] Concept cards: "Parent/Child Jobs", "Dead Letter Queue", "Routing Keys", "Partial Availability"
 
 **Deliverable:** Complete Scenario 3 with all learning features.
 

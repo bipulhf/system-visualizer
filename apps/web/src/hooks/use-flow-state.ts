@@ -6,6 +6,7 @@ import type {
   ServiceStatus,
 } from "~/components/flow/service-node";
 import type { ServiceName, SimulationEvent } from "~/lib/event-types";
+import type { SupportedScenarioId } from "~/lib/learning-content";
 import { serviceNames } from "~/lib/event-types";
 
 const serviceLabels: Record<ServiceName, string> = {
@@ -46,6 +47,22 @@ const baseEdgePairs: ReadonlyArray<{
   { source: "kafka", target: "postgres" },
 ];
 
+const videoRenditions = ["240p", "360p", "720p", "1080p", "4k"] as const;
+type VideoRendition = (typeof videoRenditions)[number];
+
+const videoNodePositions: Record<
+  "parent" | "dlq" | `child-${VideoRendition}`,
+  { x: number; y: number }
+> = {
+  parent: { x: 480, y: 328 },
+  "child-240p": { x: 322, y: 432 },
+  "child-360p": { x: 410, y: 432 },
+  "child-720p": { x: 498, y: 432 },
+  "child-1080p": { x: 586, y: 432 },
+  "child-4k": { x: 674, y: 432 },
+  dlq: { x: 790, y: 432 },
+};
+
 type ServiceStats = {
   count: number;
   latencyTotal: number;
@@ -57,6 +74,13 @@ type ServiceStats = {
 type EdgeStats = {
   count: number;
   active: boolean;
+};
+
+type VideoGraphSnapshot = {
+  parentCreated: number;
+  childCreatedByRendition: Record<VideoRendition, number>;
+  progressByRendition: Record<VideoRendition, number>;
+  dlqRenditions: Set<VideoRendition>;
 };
 
 export interface ServiceMetric {
@@ -157,7 +181,97 @@ function createDefaultEdgeStats(): Record<string, EdgeStats> {
   };
 }
 
-export function useFlowState(events: SimulationEvent[]): {
+function isVideoRendition(value: string): value is VideoRendition {
+  return videoRenditions.includes(value as VideoRendition);
+}
+
+function createVideoGraphSnapshot(events: SimulationEvent[]): VideoGraphSnapshot {
+  const childCreatedByRendition: Record<VideoRendition, number> = {
+    "240p": 0,
+    "360p": 0,
+    "720p": 0,
+    "1080p": 0,
+    "4k": 0,
+  };
+
+  const progressByRendition: Record<VideoRendition, number> = {
+    "240p": 0,
+    "360p": 0,
+    "720p": 0,
+    "1080p": 0,
+    "4k": 0,
+  };
+
+  const dlqRenditions = new Set<VideoRendition>();
+  let parentCreated = 0;
+
+  for (const event of events) {
+    const workflow = event.data.workflow;
+    const renditionRaw = event.data.rendition;
+    const rendition =
+      typeof renditionRaw === "string" && isVideoRendition(renditionRaw)
+        ? renditionRaw
+        : null;
+
+    if (event.kind === "bullmq.job.created" && workflow === "video-parent") {
+      parentCreated += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.created" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      childCreatedByRendition[rendition] += 1;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.progress" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      const progressValue = event.data.progress;
+      if (typeof progressValue === "number") {
+        progressByRendition[rendition] = Math.max(
+          progressByRendition[rendition],
+          Math.trunc(progressValue),
+        );
+      }
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.completed" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      progressByRendition[rendition] = 100;
+      continue;
+    }
+
+    if (
+      event.kind === "bullmq.job.dlq" &&
+      workflow === "video-child" &&
+      rendition
+    ) {
+      dlqRenditions.add(rendition);
+    }
+  }
+
+  return {
+    parentCreated,
+    childCreatedByRendition,
+    progressByRendition,
+    dlqRenditions,
+  };
+}
+
+export function useFlowState(
+  events: SimulationEvent[],
+  scenarioId: SupportedScenarioId,
+): {
   nodes: Node<ServiceNodeData, "serviceNode">[];
   edges: Edge<AnimatedEdgeData, "animatedEdge">[];
   metrics: ServiceMetric[];
@@ -291,10 +405,125 @@ export function useFlowState(events: SimulationEvent[]): {
       },
     );
 
+    if (scenarioId !== "video-pipeline") {
+      return {
+        nodes,
+        edges,
+        metrics,
+      };
+    }
+
+    const videoSnapshot = createVideoGraphSnapshot(events);
+
+    const videoNodes: Node<ServiceNodeData, "serviceNode">[] = [];
+
+    videoNodes.push({
+      id: "video-parent",
+      type: "serviceNode",
+      position: videoNodePositions.parent,
+      data: {
+        service: "bullmq",
+        label: "Parent Flow",
+        status: videoSnapshot.parentCreated > 0 ? "active" : "idle",
+        opsPerSec: videoSnapshot.parentCreated,
+        queueDepth: 0,
+        colorVar: "--bullmq",
+      },
+    });
+
+    for (const rendition of videoRenditions) {
+      const createdCount = videoSnapshot.childCreatedByRendition[rendition];
+      const progress = videoSnapshot.progressByRendition[rendition];
+      const inDlq = videoSnapshot.dlqRenditions.has(rendition);
+
+      const status: ServiceStatus = inDlq
+        ? "error"
+        : createdCount > 0 || progress > 0
+          ? "active"
+          : "idle";
+
+      videoNodes.push({
+        id: `video-child-${rendition}`,
+        type: "serviceNode",
+        position: videoNodePositions[`child-${rendition}`],
+        data: {
+          service: "bullmq",
+          label: `${rendition}${inDlq ? " DLQ" : ` ${progress}%`}`,
+          status,
+          opsPerSec: Number((progress / 100).toFixed(1)),
+          queueDepth: inDlq ? 1 : 0,
+          colorVar: "--bullmq",
+        },
+      });
+    }
+
+    videoNodes.push({
+      id: "video-dlq",
+      type: "serviceNode",
+      position: videoNodePositions.dlq,
+      data: {
+        service: "bullmq",
+        label: "DLQ Graveyard",
+        status: videoSnapshot.dlqRenditions.size > 0 ? "error" : "idle",
+        opsPerSec: videoSnapshot.dlqRenditions.size,
+        queueDepth: videoSnapshot.dlqRenditions.size,
+        colorVar: "--rabbitmq",
+      },
+    });
+
+    const videoEdges: Edge<AnimatedEdgeData, "animatedEdge">[] = [
+      {
+        id: "bullmq->video-parent",
+        source: "bullmq",
+        target: "video-parent",
+        type: "animatedEdge",
+        animated: videoSnapshot.parentCreated > 0,
+        data: {
+          messageCount: videoSnapshot.parentCreated,
+          colorVar: "--bullmq",
+          active: videoSnapshot.parentCreated > 0,
+        },
+      },
+    ];
+
+    for (const rendition of videoRenditions) {
+      const createdCount = videoSnapshot.childCreatedByRendition[rendition];
+
+      videoEdges.push({
+        id: `video-parent->video-child-${rendition}`,
+        source: "video-parent",
+        target: `video-child-${rendition}`,
+        type: "animatedEdge",
+        animated: createdCount > 0,
+        data: {
+          messageCount: createdCount,
+          colorVar: "--bullmq",
+          active: createdCount > 0,
+        },
+      });
+
+      if (!videoSnapshot.dlqRenditions.has(rendition)) {
+        continue;
+      }
+
+      videoEdges.push({
+        id: `video-child-${rendition}->video-dlq`,
+        source: `video-child-${rendition}`,
+        target: "video-dlq",
+        type: "animatedEdge",
+        animated: true,
+        data: {
+          messageCount: 1,
+          colorVar: "--rabbitmq",
+          active: true,
+        },
+      });
+    }
+
     return {
-      nodes,
-      edges,
+      nodes: [...nodes, ...videoNodes],
+      edges: [...edges, ...videoEdges],
       metrics,
     };
-  }, [events]);
+  }, [events, scenarioId]);
 }

@@ -12,7 +12,10 @@ export type SimulationConnectionState =
   | "closed"
   | "error";
 
-export type SimulationScenario = "flash-sale" | "ride-sharing";
+export type SimulationScenario =
+  | "flash-sale"
+  | "ride-sharing"
+  | "video-pipeline";
 
 type SimulationSocketHandlers = {
   onStateChange: (state: SimulationConnectionState) => void;
@@ -175,7 +178,7 @@ export function createSimulationWebSocket(handlers: SimulationSocketHandlers): {
       return;
     }
 
-    const safePhase = Math.min(4, Math.max(1, Math.trunc(phase)));
+    const safePhase = Math.min(5, Math.max(1, Math.trunc(phase)));
     const command: SimulationCommand = {
       command: "jump_phase",
       phase: safePhase,

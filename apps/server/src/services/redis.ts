@@ -42,7 +42,7 @@ function emitRedisOperation(
   context: SimulationContext,
   data: Record<string, string | number | boolean | null>,
   description: string,
-  target?: "bullmq" | "kafka",
+  target?: "bullmq" | "rabbitmq" | "kafka" | "postgres",
   latencyMs: number = 0,
 ): void {
   const baseEvent = {
@@ -293,6 +293,57 @@ export async function publishRedisMessage(
   );
 
   return subscribers;
+}
+
+export async function setExpiringRedisValue(
+  key: string,
+  value: string,
+  ttlSeconds: number,
+  context: SimulationContext,
+  target?: "bullmq" | "rabbitmq" | "kafka" | "postgres",
+): Promise<void> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+  await redis.set(key, value, "EX", ttlSeconds);
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "SETEX",
+      key,
+      value,
+      ttlSeconds,
+      requestId: context.requestId,
+    },
+    `Redis SETEX ${key}`,
+    target,
+    Math.round(performance.now() - startedAt),
+  );
+}
+
+export async function deleteRedisKey(
+  key: string,
+  context: SimulationContext,
+  target?: "bullmq" | "rabbitmq" | "kafka" | "postgres",
+): Promise<number> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+  const deletedCount = await redis.del(key);
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "DEL",
+      key,
+      deletedCount,
+      requestId: context.requestId,
+    },
+    `Redis DEL ${key}`,
+    target,
+    Math.round(performance.now() - startedAt),
+  );
+
+  return deletedCount;
 }
 
 export async function closeRedisConnection(): Promise<void> {

@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ScenariosVideoPipelineRouteImport } from './routes/scenarios/video-pipeline'
 import { Route as ScenariosRideSharingRouteImport } from './routes/scenarios/ride-sharing'
 import { Route as ScenariosFlashSaleRouteImport } from './routes/scenarios/flash-sale'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScenariosVideoPipelineRoute = ScenariosVideoPipelineRouteImport.update({
+  id: '/scenarios/video-pipeline',
+  path: '/scenarios/video-pipeline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScenariosRideSharingRoute = ScenariosRideSharingRouteImport.update({
@@ -33,30 +39,47 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
+  '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
+  '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/scenarios/flash-sale': typeof ScenariosFlashSaleRoute
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
+  '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/scenarios/flash-sale' | '/scenarios/ride-sharing'
+  fullPaths:
+    | '/'
+    | '/scenarios/flash-sale'
+    | '/scenarios/ride-sharing'
+    | '/scenarios/video-pipeline'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/scenarios/flash-sale' | '/scenarios/ride-sharing'
-  id: '__root__' | '/' | '/scenarios/flash-sale' | '/scenarios/ride-sharing'
+  to:
+    | '/'
+    | '/scenarios/flash-sale'
+    | '/scenarios/ride-sharing'
+    | '/scenarios/video-pipeline'
+  id:
+    | '__root__'
+    | '/'
+    | '/scenarios/flash-sale'
+    | '/scenarios/ride-sharing'
+    | '/scenarios/video-pipeline'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ScenariosFlashSaleRoute: typeof ScenariosFlashSaleRoute
   ScenariosRideSharingRoute: typeof ScenariosRideSharingRoute
+  ScenariosVideoPipelineRoute: typeof ScenariosVideoPipelineRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +89,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scenarios/video-pipeline': {
+      id: '/scenarios/video-pipeline'
+      path: '/scenarios/video-pipeline'
+      fullPath: '/scenarios/video-pipeline'
+      preLoaderRoute: typeof ScenariosVideoPipelineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scenarios/ride-sharing': {
@@ -89,6 +119,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ScenariosFlashSaleRoute: ScenariosFlashSaleRoute,
   ScenariosRideSharingRoute: ScenariosRideSharingRoute,
+  ScenariosVideoPipelineRoute: ScenariosVideoPipelineRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

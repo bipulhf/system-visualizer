@@ -17,6 +17,14 @@ import {
   stopRideSharingScenario,
 } from "./scenarios/ride-sharing";
 import {
+  getVideoPipelineStatus,
+  isVideoPipelineScenarioRunning,
+  setVideoPipelineScenarioPhase,
+  setVideoPipelineUploadTarget,
+  startVideoPipelineScenario,
+  stopVideoPipelineScenario,
+} from "./scenarios/video-pipeline";
+import {
   checkBullMqConnection,
   closeBullMqConnection,
 } from "./services/bullmq";
@@ -90,11 +98,12 @@ async function getServiceHealth(): Promise<HealthResponse> {
 
 let simulationClientCount = 0;
 
-type ActiveScenarioId = "flash-sale" | "ride-sharing";
+type ActiveScenarioId = "flash-sale" | "ride-sharing" | "video-pipeline";
 
 type ScenarioStatus =
   | ReturnType<typeof getFlashSaleStatus>
-  | ReturnType<typeof getRideSharingStatus>;
+  | ReturnType<typeof getRideSharingStatus>
+  | ReturnType<typeof getVideoPipelineStatus>;
 
 let activeScenario: ActiveScenarioId = "flash-sale";
 
@@ -103,7 +112,11 @@ function isScenarioRunning(scenario: ActiveScenarioId): boolean {
     return isFlashSaleScenarioRunning();
   }
 
-  return isRideSharingScenarioRunning();
+  if (scenario === "ride-sharing") {
+    return isRideSharingScenarioRunning();
+  }
+
+  return isVideoPipelineScenarioRunning();
 }
 
 function getScenarioStatus(scenario: ActiveScenarioId): ScenarioStatus {
@@ -111,7 +124,11 @@ function getScenarioStatus(scenario: ActiveScenarioId): ScenarioStatus {
     return getFlashSaleStatus();
   }
 
-  return getRideSharingStatus();
+  if (scenario === "ride-sharing") {
+    return getRideSharingStatus();
+  }
+
+  return getVideoPipelineStatus();
 }
 
 async function startScenario(scenario: ActiveScenarioId): Promise<void> {
@@ -120,7 +137,12 @@ async function startScenario(scenario: ActiveScenarioId): Promise<void> {
     return;
   }
 
-  await startRideSharingScenario();
+  if (scenario === "ride-sharing") {
+    await startRideSharingScenario();
+    return;
+  }
+
+  await startVideoPipelineScenario();
 }
 
 function setScenarioPhase(scenario: ActiveScenarioId, phase: number): void {
@@ -129,11 +151,28 @@ function setScenarioPhase(scenario: ActiveScenarioId, phase: number): void {
     return;
   }
 
-  setRideSharingScenarioPhase(phase);
+  if (scenario === "ride-sharing") {
+    setRideSharingScenarioPhase(phase);
+    return;
+  }
+
+  setVideoPipelineScenarioPhase(phase);
+}
+
+function getScenarioPhaseLimit(scenario: ActiveScenarioId): number {
+  if (scenario === "video-pipeline") {
+    return 5;
+  }
+
+  return 4;
 }
 
 async function stopAllScenarios(): Promise<void> {
-  await Promise.all([stopFlashSaleScenario(), stopRideSharingScenario()]);
+  await Promise.all([
+    stopFlashSaleScenario(),
+    stopRideSharingScenario(),
+    stopVideoPipelineScenario(),
+  ]);
 }
 
 type SimulationCommand = {
@@ -224,6 +263,7 @@ const app = new Elysia()
       status,
       flashSaleStatus: getFlashSaleStatus(),
       rideSharingStatus: getRideSharingStatus(),
+      videoPipelineStatus: getVideoPipelineStatus(),
     };
   })
   .ws("/ws/simulation", {
@@ -260,7 +300,7 @@ const app = new Elysia()
           }
 
           const phase = Math.trunc(command.phase);
-          if (phase < 1 || phase > 4) {
+          if (phase < 1 || phase > getScenarioPhaseLimit(activeScenario)) {
             return;
           }
 
@@ -293,7 +333,8 @@ const app = new Elysia()
         if (command.command === "set_scenario") {
           if (
             command.scenario !== "flash-sale" &&
-            command.scenario !== "ride-sharing"
+            command.scenario !== "ride-sharing" &&
+            command.scenario !== "video-pipeline"
           ) {
             return;
           }
@@ -317,6 +358,15 @@ const app = new Elysia()
               await startScenario(activeScenario);
             }
           })();
+          return;
+        }
+
+        if (command.command === "set_video_upload_target") {
+          if (typeof command.requestTarget !== "number") {
+            return;
+          }
+
+          setVideoPipelineUploadTarget(command.requestTarget);
         }
       } catch {
         return;

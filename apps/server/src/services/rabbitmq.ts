@@ -25,10 +25,27 @@ const rideConsumerNames = [
   "ride-sharing.dispatcher-c",
 ] as const;
 
+const videoExchangeName = "video-pipeline.events.topic";
+const videoRoutingBindings = [
+  {
+    routingKey: "video.cdn.ready",
+    queueName: "video-pipeline.cdn.ready",
+  },
+  {
+    routingKey: "video.search.index",
+    queueName: "video-pipeline.search.index",
+  },
+  {
+    routingKey: "video.notify.ready",
+    queueName: "video-pipeline.notify.ready",
+  },
+] as const;
+
 let rabbitConnection: ChannelModel | null = null;
 let rabbitChannel: Channel | null = null;
 let flashConsumersInitialized = false;
 let rideConsumersInitialized = false;
+let videoConsumersInitialized = false;
 
 function parseMessageBody(body: string): string[] {
   return body.split("|");
@@ -58,6 +75,19 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
       rideExchangeName,
       rideRoutingKey,
     );
+
+    await rabbitChannel.assertExchange(videoExchangeName, "topic", {
+      durable: false,
+    });
+
+    for (const binding of videoRoutingBindings) {
+      await rabbitChannel.assertQueue(binding.queueName, { durable: false });
+      await rabbitChannel.bindQueue(
+        binding.queueName,
+        videoExchangeName,
+        binding.routingKey,
+      );
+    }
   }
 
   const channel = rabbitChannel;
@@ -170,6 +200,71 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
     rideConsumersInitialized = true;
   }
 
+  if (!videoConsumersInitialized) {
+    for (const binding of videoRoutingBindings) {
+      await channel.consume(
+        binding.queueName,
+        (message: ConsumeMessage | null) => {
+          if (!message || !rabbitChannel) {
+            return;
+          }
+
+          const payload = message.content.toString();
+          const chunks = parseMessageBody(payload);
+          const scenario = chunks[0] ?? "video-pipeline";
+          const phase = Number(chunks[1] ?? "4");
+          const requestId = chunks[2] ?? "unknown";
+          const uploadId = chunks[3] ?? "unknown-upload";
+          const rendition = chunks[4] ?? "unknown-rendition";
+          const routingKey = chunks[5] ?? binding.routingKey;
+          const detail = chunks[6] ?? "video_event";
+
+          emitSimulationEvent({
+            scenario,
+            phase,
+            kind: "rabbitmq.consumed",
+            source: "rabbitmq",
+            target: "kafka",
+            data: {
+              requestId,
+              queue: binding.queueName,
+              exchange: videoExchangeName,
+              routingKey,
+              uploadId,
+              rendition,
+              detail,
+            },
+            latencyMs: 0,
+            description: `RabbitMQ ${binding.queueName} consumed ${requestId}`,
+          });
+
+          rabbitChannel.ack(message);
+
+          emitSimulationEvent({
+            scenario,
+            phase,
+            kind: "rabbitmq.ack",
+            source: "rabbitmq",
+            target: "kafka",
+            data: {
+              requestId,
+              queue: binding.queueName,
+              exchange: videoExchangeName,
+              routingKey,
+              uploadId,
+              rendition,
+              detail,
+            },
+            latencyMs: 0,
+            description: `RabbitMQ ACK ${requestId} on ${binding.queueName}`,
+          });
+        },
+      );
+    }
+
+    videoConsumersInitialized = true;
+  }
+
   return channel;
 }
 
@@ -274,6 +369,64 @@ export async function publishRideDispatchMessage(
   });
 }
 
+export async function publishVideoPipelineMessage(
+  context: SimulationContext,
+  options: {
+    uploadId: string;
+    rendition: string;
+    routingKey: (typeof videoRoutingBindings)[number]["routingKey"];
+    detail: string;
+  },
+): Promise<void> {
+  const startedAt = performance.now();
+  const channel = await ensureRabbitMqChannel();
+
+  const body = `${context.scenario}|${context.phase}|${context.requestId}|${options.uploadId}|${options.rendition}|${options.routingKey}|${options.detail}`;
+  channel.publish(videoExchangeName, options.routingKey, Buffer.from(body));
+
+  const latencyMs = Math.round(performance.now() - startedAt);
+  const queueName =
+    videoRoutingBindings.find((binding) => binding.routingKey === options.routingKey)
+      ?.queueName ?? "video-pipeline.unmatched";
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "rabbitmq.published",
+    source: "rabbitmq",
+    target: "rabbitmq",
+    data: {
+      requestId: context.requestId,
+      uploadId: options.uploadId,
+      rendition: options.rendition,
+      exchange: videoExchangeName,
+      routingKey: options.routingKey,
+      detail: options.detail,
+    },
+    latencyMs,
+    description: `RabbitMQ published video event ${context.requestId}`,
+  });
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "rabbitmq.routed",
+    source: "rabbitmq",
+    target: "kafka",
+    data: {
+      requestId: context.requestId,
+      uploadId: options.uploadId,
+      rendition: options.rendition,
+      exchange: videoExchangeName,
+      routingKey: options.routingKey,
+      queue: queueName,
+      detail: options.detail,
+    },
+    latencyMs,
+    description: `RabbitMQ routed video event ${context.requestId} to ${queueName}`,
+  });
+}
+
 export async function closeRabbitMqConnection(): Promise<void> {
   if (rabbitChannel) {
     await rabbitChannel.close();
@@ -287,4 +440,5 @@ export async function closeRabbitMqConnection(): Promise<void> {
 
   flashConsumersInitialized = false;
   rideConsumersInitialized = false;
+  videoConsumersInitialized = false;
 }
