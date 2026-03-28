@@ -8,10 +8,62 @@ const redis = new Redis(env.redisUrl, {
   maxRetriesPerRequest: 1,
 });
 
+let redisConnectionPromise: Promise<void> | null = null;
+
 async function ensureRedisConnection(): Promise<void> {
-  if (redis.status !== "ready") {
-    await redis.connect();
+  if (redis.status === "ready") {
+    return;
   }
+
+  if (redisConnectionPromise) {
+    await redisConnectionPromise;
+    return;
+  }
+
+  redisConnectionPromise = redis
+    .connect()
+    .catch((error: Error) => {
+      if (error.message.includes("already connecting/connected")) {
+        return;
+      }
+
+      throw error;
+    })
+    .finally(() => {
+      redisConnectionPromise = null;
+    });
+
+  await redisConnectionPromise;
+
+  await redis.ping();
+}
+
+function emitRedisOperation(
+  context: SimulationContext,
+  data: Record<string, string | number | boolean | null>,
+  description: string,
+  target?: "bullmq" | "kafka",
+  latencyMs: number = 0,
+): void {
+  const baseEvent = {
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "redis.op",
+    source: "redis",
+    data,
+    latencyMs,
+    description,
+  } as const;
+
+  if (target) {
+    emitSimulationEvent({
+      ...baseEvent,
+      target,
+    });
+    return;
+  }
+
+  emitSimulationEvent(baseEvent);
 }
 
 export async function checkRedisConnection(): Promise<void> {
@@ -29,20 +81,18 @@ export async function setRedisValue(
   await ensureRedisConnection();
   await redis.set(key, value);
 
-  emitSimulationEvent({
-    scenario: context.scenario,
-    phase: context.phase,
-    kind: "redis.op",
-    source: "redis",
-    data: {
+  emitRedisOperation(
+    context,
+    {
       operation: "SET",
       key,
       value,
       requestId: context.requestId,
     },
-    latencyMs: Math.round(performance.now() - startedAt),
-    description: `Redis SET ${key}`,
-  });
+    `Redis SET ${key}`,
+    undefined,
+    Math.round(performance.now() - startedAt),
+  );
 }
 
 export async function decrementRedisKey(
@@ -53,21 +103,18 @@ export async function decrementRedisKey(
   await ensureRedisConnection();
   const value = await redis.decr(key);
 
-  emitSimulationEvent({
-    scenario: context.scenario,
-    phase: context.phase,
-    kind: "redis.op",
-    source: "redis",
-    target: "bullmq",
-    data: {
+  emitRedisOperation(
+    context,
+    {
       operation: "DECR",
       key,
       value,
       requestId: context.requestId,
     },
-    latencyMs: Math.round(performance.now() - startedAt),
-    description: `Redis DECR ${key} -> ${value}`,
-  });
+    `Redis DECR ${key} -> ${value}`,
+    "bullmq",
+    Math.round(performance.now() - startedAt),
+  );
 
   return value;
 }
@@ -80,21 +127,18 @@ export async function incrementRedisKey(
   await ensureRedisConnection();
   const value = await redis.incr(key);
 
-  emitSimulationEvent({
-    scenario: context.scenario,
-    phase: context.phase,
-    kind: "redis.op",
-    source: "redis",
-    target: "bullmq",
-    data: {
+  emitRedisOperation(
+    context,
+    {
       operation: "INCR",
       key,
       value,
       requestId: context.requestId,
     },
-    latencyMs: Math.round(performance.now() - startedAt),
-    description: `Redis INCR ${key} -> ${value}`,
-  });
+    `Redis INCR ${key} -> ${value}`,
+    "bullmq",
+    Math.round(performance.now() - startedAt),
+  );
 
   return value;
 }
@@ -123,12 +167,9 @@ export async function checkSlidingWindowRateLimit(
   const count = typeof countResult === "number" ? countResult : 0;
   const allowed = count <= maxRequests;
 
-  emitSimulationEvent({
-    scenario: context.scenario,
-    phase: context.phase,
-    kind: "redis.op",
-    source: "redis",
-    data: {
+  emitRedisOperation(
+    context,
+    {
       operation: "SLIDING_WINDOW",
       key,
       count,
@@ -136,11 +177,122 @@ export async function checkSlidingWindowRateLimit(
       allowed,
       requestId: context.requestId,
     },
-    latencyMs: Math.round(performance.now() - startedAt),
-    description: `Redis rate-limit window count ${count}/${maxRequests}`,
-  });
+    `Redis rate-limit window count ${count}/${maxRequests}`,
+    undefined,
+    Math.round(performance.now() - startedAt),
+  );
 
   return { allowed, count };
+}
+
+export async function geoAddDriverLocation(
+  key: string,
+  driverId: string,
+  longitude: number,
+  latitude: number,
+  heartbeatTtlSeconds: number,
+  context: SimulationContext,
+): Promise<void> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+
+  await redis.geoadd(key, longitude, latitude, driverId);
+  await redis.set(
+    `${key}:heartbeat:${driverId}`,
+    String(Date.now()),
+    "EX",
+    heartbeatTtlSeconds,
+  );
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "GEOADD",
+      key,
+      driverId,
+      longitude: Number(longitude.toFixed(6)),
+      latitude: Number(latitude.toFixed(6)),
+      ttlSeconds: heartbeatTtlSeconds,
+      requestId: context.requestId,
+    },
+    `Redis GEOADD ${driverId}`,
+    "bullmq",
+    Math.round(performance.now() - startedAt),
+  );
+}
+
+export async function geoSearchNearbyDrivers(
+  key: string,
+  longitude: number,
+  latitude: number,
+  radiusKm: number,
+  maxResults: number,
+  context: SimulationContext,
+): Promise<string[]> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+
+  const rawDriverIds = await redis.geosearch(
+    key,
+    "FROMLONLAT",
+    longitude,
+    latitude,
+    "BYRADIUS",
+    radiusKm,
+    "km",
+    "ASC",
+    "COUNT",
+    maxResults,
+  );
+
+  const driverIds: string[] = rawDriverIds.filter(
+    (value): value is string => typeof value === "string",
+  );
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "GEOSEARCH",
+      key,
+      longitude: Number(longitude.toFixed(6)),
+      latitude: Number(latitude.toFixed(6)),
+      radiusKm: Number(radiusKm.toFixed(2)),
+      maxResults,
+      matched: driverIds.length,
+      requestId: context.requestId,
+    },
+    `Redis GEOSEARCH matched ${driverIds.length} drivers`,
+    "bullmq",
+    Math.round(performance.now() - startedAt),
+  );
+
+  return driverIds;
+}
+
+export async function publishRedisMessage(
+  channel: string,
+  payload: string,
+  context: SimulationContext,
+): Promise<number> {
+  const startedAt = performance.now();
+  await ensureRedisConnection();
+  const subscribers = await redis.publish(channel, payload);
+
+  emitRedisOperation(
+    context,
+    {
+      operation: "PUBLISH",
+      channel,
+      subscribers,
+      payloadSize: payload.length,
+      requestId: context.requestId,
+    },
+    `Redis PUBLISH ${channel}`,
+    "kafka",
+    Math.round(performance.now() - startedAt),
+  );
+
+  return subscribers;
 }
 
 export async function closeRedisConnection(): Promise<void> {

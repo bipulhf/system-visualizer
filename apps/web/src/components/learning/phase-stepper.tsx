@@ -1,4 +1,7 @@
-import { flashSalePhases } from "~/lib/learning-content";
+import {
+  getScenarioLearningContent,
+  type SupportedScenarioId,
+} from "~/lib/learning-content";
 import { useSimulationUi } from "~/lib/simulation-ui-context";
 import type { ServiceName } from "~/lib/event-types";
 
@@ -11,8 +14,13 @@ const serviceColorVarByName: Record<ServiceName, string> = {
   postgres: "--postgres",
 };
 
-export function PhaseStepper() {
+export function PhaseStepper({
+  scenarioId,
+}: {
+  scenarioId: SupportedScenarioId;
+}) {
   const { currentPhase, setCurrentPhase, requestPhaseJump } = useSimulationUi();
+  const phases = getScenarioLearningContent(scenarioId).phases;
 
   return (
     <section className="space-y-3">
@@ -20,7 +28,7 @@ export function PhaseStepper() {
         Phase Timeline
       </h3>
       <ol className="space-y-2">
-        {flashSalePhases.map((phase) => {
+        {phases.map((phase) => {
           const isActive = phase.id === currentPhase;
 
           return (

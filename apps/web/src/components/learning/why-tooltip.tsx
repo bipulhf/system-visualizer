@@ -1,5 +1,8 @@
 import type { ServiceName } from "~/lib/event-types";
-import { whyTechByService } from "~/lib/learning-content";
+import {
+  getScenarioLearningContent,
+  type SupportedScenarioId,
+} from "~/lib/learning-content";
 import { useSimulationUi } from "~/lib/simulation-ui-context";
 
 const serviceOrder: ServiceName[] = [
@@ -11,8 +14,14 @@ const serviceOrder: ServiceName[] = [
   "postgres",
 ];
 
-export function WhyTooltip() {
+export function WhyTooltip({
+  scenarioId,
+}: {
+  scenarioId: SupportedScenarioId;
+}) {
   const { selectedService, setSelectedService } = useSimulationUi();
+  const scenarioContent = getScenarioLearningContent(scenarioId);
+  const whyTechByService = scenarioContent.whyTechByService;
   const activeService = selectedService ?? "elysia";
   const content = whyTechByService[activeService];
 

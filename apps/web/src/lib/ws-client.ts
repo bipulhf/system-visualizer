@@ -12,6 +12,8 @@ export type SimulationConnectionState =
   | "closed"
   | "error";
 
+export type SimulationScenario = "flash-sale" | "ride-sharing";
+
 type SimulationSocketHandlers = {
   onStateChange: (state: SimulationConnectionState) => void;
   onEvent: (event: SimulationEvent) => void;
@@ -20,6 +22,11 @@ type SimulationSocketHandlers = {
 type SimulationCommand = {
   command: "jump_phase";
   phase: number;
+};
+
+type ScenarioCommand = {
+  command: "set_scenario";
+  scenario: SimulationScenario;
 };
 
 type RawSimulationEvent = {
@@ -104,6 +111,7 @@ export function createSimulationWebSocket(handlers: SimulationSocketHandlers): {
   connect: () => void;
   disconnect: () => void;
   jumpToPhase: (phase: number) => void;
+  setScenario: (scenario: SimulationScenario) => void;
 } {
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -176,9 +184,23 @@ export function createSimulationWebSocket(handlers: SimulationSocketHandlers): {
     socket.send(JSON.stringify(command));
   };
 
+  const setScenario = (scenario: SimulationScenario): void => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const command: ScenarioCommand = {
+      command: "set_scenario",
+      scenario,
+    };
+
+    socket.send(JSON.stringify(command));
+  };
+
   return {
     connect,
     disconnect,
     jumpToPhase,
+    setScenario,
   };
 }

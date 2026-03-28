@@ -9,6 +9,14 @@ import {
   stopFlashSaleScenario,
 } from "./scenarios/flash-sale";
 import {
+  getRideSharingStatus,
+  isRideSharingScenarioRunning,
+  setRideSharingRequestTarget,
+  setRideSharingScenarioPhase,
+  startRideSharingScenario,
+  stopRideSharingScenario,
+} from "./scenarios/ride-sharing";
+import {
   checkBullMqConnection,
   closeBullMqConnection,
 } from "./services/bullmq";
@@ -82,11 +90,124 @@ async function getServiceHealth(): Promise<HealthResponse> {
 
 let simulationClientCount = 0;
 
+type ActiveScenarioId = "flash-sale" | "ride-sharing";
+
+type ScenarioStatus =
+  | ReturnType<typeof getFlashSaleStatus>
+  | ReturnType<typeof getRideSharingStatus>;
+
+let activeScenario: ActiveScenarioId = "flash-sale";
+
+function isScenarioRunning(scenario: ActiveScenarioId): boolean {
+  if (scenario === "flash-sale") {
+    return isFlashSaleScenarioRunning();
+  }
+
+  return isRideSharingScenarioRunning();
+}
+
+function getScenarioStatus(scenario: ActiveScenarioId): ScenarioStatus {
+  if (scenario === "flash-sale") {
+    return getFlashSaleStatus();
+  }
+
+  return getRideSharingStatus();
+}
+
+async function startScenario(scenario: ActiveScenarioId): Promise<void> {
+  if (scenario === "flash-sale") {
+    await startFlashSaleScenario();
+    return;
+  }
+
+  await startRideSharingScenario();
+}
+
+function setScenarioPhase(scenario: ActiveScenarioId, phase: number): void {
+  if (scenario === "flash-sale") {
+    setFlashSaleScenarioPhase(phase);
+    return;
+  }
+
+  setRideSharingScenarioPhase(phase);
+}
+
+async function stopAllScenarios(): Promise<void> {
+  await Promise.all([stopFlashSaleScenario(), stopRideSharingScenario()]);
+}
+
 type SimulationCommand = {
   command?: string;
   phase?: number;
   requestTarget?: number;
+  scenario?: string;
 };
+
+type SimulationMessagePayload =
+  | string
+  | Uint8Array
+  | ArrayBuffer
+  | SimulationCommand
+  | null
+  | undefined;
+
+function normalizeSimulationCommand(
+  value: SimulationCommand,
+): SimulationCommand | null {
+  const normalized: SimulationCommand = {};
+
+  if (typeof value.command === "string") {
+    normalized.command = value.command;
+  }
+
+  if (typeof value.phase === "number") {
+    normalized.phase = value.phase;
+  }
+
+  if (typeof value.requestTarget === "number") {
+    normalized.requestTarget = value.requestTarget;
+  }
+
+  if (typeof value.scenario === "string") {
+    normalized.scenario = value.scenario;
+  }
+
+  return normalized.command ? normalized : null;
+}
+
+function parseSimulationCommand(
+  message: SimulationMessagePayload,
+): SimulationCommand | null {
+  if (message === null || message === undefined) {
+    return null;
+  }
+
+  if (
+    typeof message === "object" &&
+    !(message instanceof Uint8Array) &&
+    !(message instanceof ArrayBuffer)
+  ) {
+    return normalizeSimulationCommand(message);
+  }
+
+  const payload =
+    typeof message === "string"
+      ? message
+      : message instanceof Uint8Array
+        ? new TextDecoder().decode(message)
+        : new TextDecoder().decode(new Uint8Array(message));
+
+  try {
+    const parsed = JSON.parse(payload) as SimulationCommand;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    return normalizeSimulationCommand(parsed);
+  } catch {
+    return null;
+  }
+}
 
 const app = new Elysia()
   .get("/health", async () => {
@@ -94,13 +215,15 @@ const app = new Elysia()
     return result;
   })
   .get("/simulation/harness", () => {
-    const status = getFlashSaleStatus();
+    const status = getScenarioStatus(activeScenario);
 
     return {
-      running: isFlashSaleScenarioRunning(),
+      running: isScenarioRunning(activeScenario),
       connectedClients: simulationClientCount,
-      scenario: "flash-sale",
+      scenario: activeScenario,
       status,
+      flashSaleStatus: getFlashSaleStatus(),
+      rideSharingStatus: getRideSharingStatus(),
     };
   })
   .ws("/ws/simulation", {
@@ -108,25 +231,29 @@ const app = new Elysia()
       ws.subscribe("simulation");
       simulationClientCount += 1;
 
-      if (!isFlashSaleScenarioRunning()) {
-        void startFlashSaleScenario();
-      }
+      // Give clients a short window to send their preferred scenario before
+      // auto-starting the default scenario.
+      setTimeout(() => {
+        if (simulationClientCount > 0 && !isScenarioRunning(activeScenario)) {
+          void startScenario(activeScenario);
+        }
+      }, 100);
     },
     close(ws) {
       ws.unsubscribe("simulation");
       simulationClientCount = Math.max(0, simulationClientCount - 1);
 
       if (simulationClientCount === 0) {
-        void stopFlashSaleScenario();
+        void stopAllScenarios();
       }
     },
-    message(_, message) {
-      if (typeof message !== "string") {
+    message(_, message: SimulationMessagePayload) {
+      const command = parseSimulationCommand(message);
+      if (command === null) {
         return;
       }
 
       try {
-        const command = JSON.parse(message) as SimulationCommand;
         if (command.command === "jump_phase") {
           if (typeof command.phase !== "number") {
             return;
@@ -137,11 +264,11 @@ const app = new Elysia()
             return;
           }
 
-          if (!isFlashSaleScenarioRunning()) {
-            void startFlashSaleScenario();
+          if (!isScenarioRunning(activeScenario)) {
+            void startScenario(activeScenario);
           }
 
-          setFlashSaleScenarioPhase(phase);
+          setScenarioPhase(activeScenario, phase);
           return;
         }
 
@@ -151,6 +278,45 @@ const app = new Elysia()
           }
 
           setFlashSaleRequestTarget(command.requestTarget);
+          return;
+        }
+
+        if (command.command === "set_ride_request_target") {
+          if (typeof command.requestTarget !== "number") {
+            return;
+          }
+
+          setRideSharingRequestTarget(command.requestTarget);
+          return;
+        }
+
+        if (command.command === "set_scenario") {
+          if (
+            command.scenario !== "flash-sale" &&
+            command.scenario !== "ride-sharing"
+          ) {
+            return;
+          }
+
+          const nextScenario = command.scenario;
+          if (nextScenario === activeScenario) {
+            if (
+              simulationClientCount > 0 &&
+              !isScenarioRunning(activeScenario)
+            ) {
+              void startScenario(activeScenario);
+            }
+            return;
+          }
+
+          activeScenario = nextScenario;
+
+          void (async () => {
+            await stopAllScenarios();
+            if (simulationClientCount > 0) {
+              await startScenario(activeScenario);
+            }
+          })();
         }
       } catch {
         return;
@@ -169,7 +335,7 @@ log("info", "Elysia server started", {
 
 const shutdown = async (): Promise<void> => {
   unsubscribeFromSimulationBus();
-  await stopFlashSaleScenario();
+  await stopAllScenarios();
 
   await Promise.allSettled([
     closeBullMqConnection(),

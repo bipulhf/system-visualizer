@@ -1,5 +1,8 @@
 import type { ServiceName } from "~/lib/event-types";
-import { whatIfByService } from "~/lib/learning-content";
+import {
+  getScenarioLearningContent,
+  type SupportedScenarioId,
+} from "~/lib/learning-content";
 import { useSimulationUi } from "~/lib/simulation-ui-context";
 
 const serviceOrder: ServiceName[] = [
@@ -11,7 +14,11 @@ const serviceOrder: ServiceName[] = [
   "postgres",
 ];
 
-export function WhatIfToggle() {
+export function WhatIfToggle({
+  scenarioId,
+}: {
+  scenarioId: SupportedScenarioId;
+}) {
   const {
     whatIfEnabled,
     setWhatIfEnabled,
@@ -19,6 +26,8 @@ export function WhatIfToggle() {
     setWhatIfService,
     failureCount,
   } = useSimulationUi();
+  const scenarioContent = getScenarioLearningContent(scenarioId);
+  const whatIfByService = scenarioContent.whatIfByService;
   const current = whatIfByService[whatIfService];
 
   return (

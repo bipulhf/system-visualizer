@@ -8,32 +8,65 @@ const kafka = new Kafka({
   clientId: "visualizer-flash-sale-simulation",
 });
 
-const defaultTopicName = "flash-sale-events";
+export type KafkaTopicName = "flash-sale-events" | "trip-events";
+
+const defaultTopicName: KafkaTopicName = "flash-sale-events";
 
 const producer = kafka.producer();
 
-const consumerConfigs = [
-  { groupId: "flash-sale-analytics", delayMs: 35 },
-  { groupId: "flash-sale-notifications", delayMs: 95 },
-  { groupId: "flash-sale-fraud", delayMs: 180 },
-] as const;
+const topicConsumerConfigs: Record<
+  KafkaTopicName,
+  ReadonlyArray<{ groupId: string; delayMs: number }>
+> = {
+  "flash-sale-events": [
+    { groupId: "flash-sale-analytics", delayMs: 35 },
+    { groupId: "flash-sale-notifications", delayMs: 95 },
+    { groupId: "flash-sale-fraud", delayMs: 180 },
+  ],
+  "trip-events": [
+    { groupId: "ride-ops", delayMs: 45 },
+    { groupId: "ride-passenger-notify", delayMs: 120 },
+    { groupId: "ride-billing", delayMs: 220 },
+  ],
+};
+
+const topicPartitions: Record<KafkaTopicName, number> = {
+  "flash-sale-events": 3,
+  "trip-events": 3,
+};
 
 type ConsumerRuntime = {
   consumer: ReturnType<Kafka["consumer"]>;
   connected: boolean;
   groupId: string;
   delayMs: number;
+  topic: KafkaTopicName;
 };
 
-const consumerRuntimes: ConsumerRuntime[] = consumerConfigs.map((config) => ({
-  consumer: kafka.consumer({ groupId: config.groupId }),
-  connected: false,
-  groupId: config.groupId,
-  delayMs: config.delayMs,
-}));
+const topicConsumerRuntimes: Record<KafkaTopicName, ConsumerRuntime[]> = {
+  "flash-sale-events": topicConsumerConfigs["flash-sale-events"].map(
+    (config) => ({
+      consumer: kafka.consumer({ groupId: config.groupId }),
+      connected: false,
+      groupId: config.groupId,
+      delayMs: config.delayMs,
+      topic: "flash-sale-events",
+    }),
+  ),
+  "trip-events": topicConsumerConfigs["trip-events"].map((config) => ({
+    consumer: kafka.consumer({ groupId: config.groupId }),
+    connected: false,
+    groupId: config.groupId,
+    delayMs: config.delayMs,
+    topic: "trip-events",
+  })),
+};
 
 let producerConnected = false;
-let topicEnsured = false;
+let topicEnsured: Record<KafkaTopicName, boolean> = {
+  "flash-sale-events": false,
+  "trip-events": false,
+};
 
 type KafkaPayload = {
   scenario: string;
@@ -57,8 +90,10 @@ function parseKafkaPayload(raw: string): KafkaPayload {
   };
 }
 
-async function ensureKafkaRuntimeConnections(): Promise<void> {
-  if (!topicEnsured) {
+async function ensureKafkaRuntimeConnections(
+  topic: KafkaTopicName,
+): Promise<void> {
+  if (!topicEnsured[topic]) {
     const admin = kafka.admin();
     await admin.connect();
 
@@ -67,13 +102,13 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
         waitForLeaders: true,
         topics: [
           {
-            topic: defaultTopicName,
-            numPartitions: 3,
+            topic,
+            numPartitions: topicPartitions[topic],
             replicationFactor: 1,
           },
         ],
       });
-      topicEnsured = true;
+      topicEnsured[topic] = true;
     } finally {
       await admin.disconnect();
     }
@@ -84,14 +119,14 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
     producerConnected = true;
   }
 
-  for (const runtime of consumerRuntimes) {
+  for (const runtime of topicConsumerRuntimes[topic]) {
     if (runtime.connected) {
       continue;
     }
 
     await runtime.consumer.connect();
     await runtime.consumer.subscribe({
-      topic: defaultTopicName,
+      topic,
       fromBeginning: false,
     });
 
@@ -112,7 +147,7 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
           target: "postgres",
           data: {
             requestId: payload.requestId,
-            topic: defaultTopicName,
+            topic,
             detail: payload.detail,
             consumerGroup: runtime.groupId,
           },
@@ -127,16 +162,17 @@ async function ensureKafkaRuntimeConnections(): Promise<void> {
 }
 
 export async function checkKafkaConnection(): Promise<void> {
-  await ensureKafkaRuntimeConnections();
+  await ensureKafkaRuntimeConnections("flash-sale-events");
+  await ensureKafkaRuntimeConnections("trip-events");
 }
 
 export async function produceKafkaEvent(
   context: SimulationContext,
   detail: string,
-  topic: string = defaultTopicName,
+  topic: KafkaTopicName = defaultTopicName,
 ): Promise<void> {
   const startedAt = performance.now();
-  await ensureKafkaRuntimeConnections();
+  await ensureKafkaRuntimeConnections(topic);
 
   const payload: KafkaPayload = {
     scenario: context.scenario,
@@ -169,13 +205,15 @@ export async function produceKafkaEvent(
 }
 
 export async function closeKafkaConnection(): Promise<void> {
-  for (const runtime of consumerRuntimes) {
-    if (!runtime.connected) {
-      continue;
-    }
+  for (const topic of Object.keys(topicConsumerRuntimes) as KafkaTopicName[]) {
+    for (const runtime of topicConsumerRuntimes[topic]) {
+      if (!runtime.connected) {
+        continue;
+      }
 
-    await runtime.consumer.disconnect();
-    runtime.connected = false;
+      await runtime.consumer.disconnect();
+      runtime.connected = false;
+    }
   }
 
   if (producerConnected) {
@@ -183,5 +221,8 @@ export async function closeKafkaConnection(): Promise<void> {
     producerConnected = false;
   }
 
-  topicEnsured = false;
+  topicEnsured = {
+    "flash-sale-events": false,
+    "trip-events": false,
+  };
 }

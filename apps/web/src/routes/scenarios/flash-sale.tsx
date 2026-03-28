@@ -6,5 +6,5 @@ export const Route = createFileRoute("/scenarios/flash-sale")({
 });
 
 function FlashSalePage() {
-  return <MainCanvasShell />;
+  return <MainCanvasShell scenarioId="flash-sale" />;
 }

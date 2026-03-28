@@ -8,17 +8,31 @@ import { emitSimulationEvent } from "../events/emitter";
 import type { SimulationContext } from "../events/types";
 import { env } from "./env";
 
-const exchangeName = "flash-sale.events.fanout";
-const queueNames = [
+const flashExchangeName = "flash-sale.events.fanout";
+const flashQueueNames = [
   "flash-sale.email",
   "flash-sale.invoice",
   "flash-sale.warehouse",
   "flash-sale.fraud",
 ] as const;
 
+const rideExchangeName = "ride-sharing.dispatch.direct";
+const rideRoutingKey = "dispatch";
+const rideQueueName = "ride-sharing.dispatch.queue";
+const rideConsumerNames = [
+  "ride-sharing.dispatcher-a",
+  "ride-sharing.dispatcher-b",
+  "ride-sharing.dispatcher-c",
+] as const;
+
 let rabbitConnection: ChannelModel | null = null;
 let rabbitChannel: Channel | null = null;
-let consumerInitialized = false;
+let flashConsumersInitialized = false;
+let rideConsumersInitialized = false;
+
+function parseMessageBody(body: string): string[] {
+  return body.split("|");
+}
 
 async function ensureRabbitMqChannel(): Promise<Channel> {
   const connection = rabbitConnection ?? (await connect(env.rabbitMqUrl));
@@ -26,14 +40,24 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
 
   if (!rabbitChannel) {
     rabbitChannel = await connection.createChannel();
-    await rabbitChannel.assertExchange(exchangeName, "fanout", {
+    await rabbitChannel.assertExchange(flashExchangeName, "fanout", {
       durable: false,
     });
 
-    for (const queueName of queueNames) {
+    for (const queueName of flashQueueNames) {
       await rabbitChannel.assertQueue(queueName, { durable: false });
-      await rabbitChannel.bindQueue(queueName, exchangeName, "");
+      await rabbitChannel.bindQueue(queueName, flashExchangeName, "");
     }
+
+    await rabbitChannel.assertExchange(rideExchangeName, "direct", {
+      durable: false,
+    });
+    await rabbitChannel.assertQueue(rideQueueName, { durable: false });
+    await rabbitChannel.bindQueue(
+      rideQueueName,
+      rideExchangeName,
+      rideRoutingKey,
+    );
   }
 
   const channel = rabbitChannel;
@@ -41,15 +65,15 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
     throw new Error("RabbitMQ channel not initialized");
   }
 
-  if (!consumerInitialized) {
-    for (const queueName of queueNames) {
+  if (!flashConsumersInitialized) {
+    for (const queueName of flashQueueNames) {
       await channel.consume(queueName, (message: ConsumeMessage | null) => {
         if (!message || !rabbitChannel) {
           return;
         }
 
         const payload = message.content.toString();
-        const chunks = payload.split("|");
+        const chunks = parseMessageBody(payload);
         const scenario = chunks[0] ?? "flash-sale";
         const phase = Number(chunks[1] ?? "3");
         const requestId = chunks[2] ?? "unknown";
@@ -86,7 +110,64 @@ async function ensureRabbitMqChannel(): Promise<Channel> {
       });
     }
 
-    consumerInitialized = true;
+    flashConsumersInitialized = true;
+  }
+
+  if (!rideConsumersInitialized) {
+    for (const consumerId of rideConsumerNames) {
+      await channel.consume(rideQueueName, (message: ConsumeMessage | null) => {
+        if (!message || !rabbitChannel) {
+          return;
+        }
+
+        const payload = message.content.toString();
+        const chunks = parseMessageBody(payload);
+        const scenario = chunks[0] ?? "ride-sharing";
+        const phase = Number(chunks[1] ?? "3");
+        const requestId = chunks[2] ?? "unknown";
+        const passengerId = chunks[3] ?? "unknown-passenger";
+        const driverId = chunks[4] ?? "unknown-driver";
+
+        emitSimulationEvent({
+          scenario,
+          phase,
+          kind: "rabbitmq.consumed",
+          source: "rabbitmq",
+          target: "kafka",
+          data: {
+            requestId,
+            queue: rideQueueName,
+            consumerId,
+            passengerId,
+            driverId,
+            competingConsumers: rideConsumerNames.length,
+          },
+          latencyMs: 0,
+          description: `RabbitMQ ${consumerId} consumed ${requestId}`,
+        });
+
+        rabbitChannel.ack(message);
+
+        emitSimulationEvent({
+          scenario,
+          phase,
+          kind: "rabbitmq.ack",
+          source: "rabbitmq",
+          target: "kafka",
+          data: {
+            requestId,
+            queue: rideQueueName,
+            consumerId,
+            passengerId,
+            driverId,
+          },
+          latencyMs: 0,
+          description: `RabbitMQ ACK ${requestId} by ${consumerId}`,
+        });
+      });
+    }
+
+    rideConsumersInitialized = true;
   }
 
   return channel;
@@ -109,7 +190,7 @@ export async function publishRabbitMqMessage(
   const channel = await ensureRabbitMqChannel();
 
   const body = `${context.scenario}|${context.phase}|${context.requestId}|${payload}`;
-  channel.publish(exchangeName, "", Buffer.from(body));
+  channel.publish(flashExchangeName, "", Buffer.from(body));
 
   const latencyMs = Math.round(performance.now() - startedAt);
 
@@ -121,13 +202,13 @@ export async function publishRabbitMqMessage(
     target: "rabbitmq",
     data: {
       requestId: context.requestId,
-      exchange: exchangeName,
+      exchange: flashExchangeName,
     },
     latencyMs,
     description: `RabbitMQ published ${context.requestId}`,
   });
 
-  for (const queueName of queueNames) {
+  for (const queueName of flashQueueNames) {
     emitSimulationEvent({
       scenario: context.scenario,
       phase: context.phase,
@@ -144,6 +225,55 @@ export async function publishRabbitMqMessage(
   }
 }
 
+export async function publishRideDispatchMessage(
+  context: SimulationContext,
+  passengerId: string,
+  driverId: string,
+): Promise<void> {
+  const startedAt = performance.now();
+  const channel = await ensureRabbitMqChannel();
+
+  const body = `${context.scenario}|${context.phase}|${context.requestId}|${passengerId}|${driverId}`;
+  channel.publish(rideExchangeName, rideRoutingKey, Buffer.from(body));
+
+  const latencyMs = Math.round(performance.now() - startedAt);
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "rabbitmq.published",
+    source: "rabbitmq",
+    target: "rabbitmq",
+    data: {
+      requestId: context.requestId,
+      passengerId,
+      driverId,
+      exchange: rideExchangeName,
+      routingKey: rideRoutingKey,
+    },
+    latencyMs,
+    description: `RabbitMQ published dispatch ${context.requestId}`,
+  });
+
+  emitSimulationEvent({
+    scenario: context.scenario,
+    phase: context.phase,
+    kind: "rabbitmq.routed",
+    source: "rabbitmq",
+    target: "kafka",
+    data: {
+      requestId: context.requestId,
+      passengerId,
+      driverId,
+      queue: rideQueueName,
+      routingKey: rideRoutingKey,
+      competingConsumers: rideConsumerNames.length,
+    },
+    latencyMs,
+    description: `RabbitMQ routed dispatch ${context.requestId}`,
+  });
+}
+
 export async function closeRabbitMqConnection(): Promise<void> {
   if (rabbitChannel) {
     await rabbitChannel.close();
@@ -155,5 +285,6 @@ export async function closeRabbitMqConnection(): Promise<void> {
     rabbitConnection = null;
   }
 
-  consumerInitialized = false;
+  flashConsumersInitialized = false;
+  rideConsumersInitialized = false;
 }

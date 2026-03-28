@@ -1,6 +1,6 @@
 /* @jsxRuntime classic */
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EventFeed } from "~/components/event-log/event-feed";
 import { FlowCanvas } from "~/components/flow/flow-canvas";
 import { ConceptCard } from "~/components/learning/concept-card";
@@ -9,10 +9,12 @@ import { Button } from "~/components/ui/button";
 import { useFlowState } from "~/hooks/use-flow-state";
 import { useSimulation } from "~/hooks/use-simulation";
 import {
-  conceptDefinitions,
+  getScenarioLearningContent,
   type ConceptDefinition,
+  type SupportedScenarioId,
 } from "~/lib/learning-content";
 import { useSimulationUi } from "~/lib/simulation-ui-context";
+import type { SimulationEvent } from "~/lib/event-types";
 
 const connectionColorByState: Record<
   "connecting" | "open" | "closed" | "error",
@@ -24,7 +26,186 @@ const connectionColorByState: Record<
   error: "bg-red-500",
 };
 
-export function MainCanvasShell() {
+type RideDriverPoint = {
+  driverId: string;
+  x: number;
+  y: number;
+};
+
+type RideOverlaySnapshot = {
+  driverPoints: RideDriverPoint[];
+  latestCountdownSec: number | null;
+  latestConsumerId: string | null;
+  latestRadiusKm: number | null;
+  latestAttempt: number | null;
+};
+
+function buildRideOverlaySnapshot(
+  events: SimulationEvent[],
+): RideOverlaySnapshot {
+  const driverCoordinates = new Map<
+    string,
+    { longitude: number; latitude: number }
+  >();
+
+  for (const event of events) {
+    if (event.kind !== "redis.op") {
+      continue;
+    }
+
+    const operation = event.data.operation;
+    const driverId = event.data.driverId;
+    const longitude = event.data.longitude;
+    const latitude = event.data.latitude;
+
+    if (
+      operation !== "GEOADD" ||
+      typeof driverId !== "string" ||
+      typeof longitude !== "number" ||
+      typeof latitude !== "number"
+    ) {
+      continue;
+    }
+
+    driverCoordinates.set(driverId, {
+      longitude,
+      latitude,
+    });
+  }
+
+  const coordinateEntries = Array.from(driverCoordinates.entries());
+  const longitudes = coordinateEntries.map(([, value]) => value.longitude);
+  const latitudes = coordinateEntries.map(([, value]) => value.latitude);
+
+  const minLongitude = longitudes.length > 0 ? Math.min(...longitudes) : -1;
+  const maxLongitude = longitudes.length > 0 ? Math.max(...longitudes) : 1;
+  const minLatitude = latitudes.length > 0 ? Math.min(...latitudes) : -1;
+  const maxLatitude = latitudes.length > 0 ? Math.max(...latitudes) : 1;
+
+  const longitudeSpan = Math.max(0.0001, maxLongitude - minLongitude);
+  const latitudeSpan = Math.max(0.0001, maxLatitude - minLatitude);
+
+  const driverPoints = coordinateEntries.map(([driverId, position]) => ({
+    driverId,
+    x: ((position.longitude - minLongitude) / longitudeSpan) * 100,
+    y: 100 - ((position.latitude - minLatitude) / latitudeSpan) * 100,
+  }));
+
+  let latestCountdownSec: number | null = null;
+  let latestConsumerId: string | null = null;
+  let latestRadiusKm: number | null = null;
+  let latestAttempt: number | null = null;
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!event) {
+      continue;
+    }
+
+    if (
+      latestCountdownSec === null &&
+      event.kind === "bullmq.job.progress" &&
+      event.data.step === "dispatch_timeout" &&
+      typeof event.data.timeRemainingSec === "number"
+    ) {
+      latestCountdownSec = event.data.timeRemainingSec;
+    }
+
+    if (
+      latestConsumerId === null &&
+      event.kind === "rabbitmq.consumed" &&
+      typeof event.data.consumerId === "string"
+    ) {
+      latestConsumerId = event.data.consumerId;
+    }
+
+    if (
+      (latestRadiusKm === null || latestAttempt === null) &&
+      event.kind === "bullmq.job.created"
+    ) {
+      if (
+        latestRadiusKm === null &&
+        typeof event.data.searchRadiusKm === "number"
+      ) {
+        latestRadiusKm = event.data.searchRadiusKm;
+      }
+
+      if (latestAttempt === null && typeof event.data.attempt === "number") {
+        latestAttempt = event.data.attempt;
+      }
+    }
+
+    if (
+      latestCountdownSec !== null &&
+      latestConsumerId !== null &&
+      latestRadiusKm !== null &&
+      latestAttempt !== null
+    ) {
+      break;
+    }
+  }
+
+  return {
+    driverPoints,
+    latestCountdownSec,
+    latestConsumerId,
+    latestRadiusKm,
+    latestAttempt,
+  };
+}
+
+function RideSharingOverlay({ events }: { events: SimulationEvent[] }) {
+  const snapshot = useMemo(() => buildRideOverlaySnapshot(events), [events]);
+
+  return (
+    <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 sm:grid-cols-[1fr,220px]">
+      <div>
+        <p className="text-[11px] font-black uppercase tracking-wide">
+          Dispatch Timeout
+        </p>
+        <p className="text-sm font-black">
+          {snapshot.latestCountdownSec === null
+            ? "Waiting for dispatch"
+            : `${snapshot.latestCountdownSec}s remaining`}
+        </p>
+        <p className="mt-1 text-xs">
+          Radius{" "}
+          {snapshot.latestRadiusKm === null
+            ? "-"
+            : `${snapshot.latestRadiusKm.toFixed(1)}km`}
+          {" · "}
+          Attempt {snapshot.latestAttempt ?? "-"}
+        </p>
+        <p className="mt-1 text-xs">
+          Winning consumer: {snapshot.latestConsumerId ?? "pending"}
+        </p>
+      </div>
+
+      <div className="neo-panel relative h-24 overflow-hidden bg-[var(--background)]">
+        <div className="absolute inset-2 rounded-sm border-2 border-dashed border-[var(--border)]/60" />
+        {snapshot.driverPoints.map((point) => (
+          <span
+            key={point.driverId}
+            className="absolute h-2 w-2 rounded-full border border-[var(--border)] bg-[var(--redis)]"
+            style={{
+              left: `calc(${point.x}% - 4px)`,
+              top: `calc(${point.y}% - 4px)`,
+            }}
+          />
+        ))}
+        <p className="absolute bottom-1 right-1 text-[10px] font-black uppercase">
+          drivers {snapshot.driverPoints.length}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export function MainCanvasShell({
+  scenarioId,
+}: {
+  scenarioId: SupportedScenarioId;
+}) {
   const {
     playbackRate,
     paused,
@@ -36,17 +217,28 @@ export function MainCanvasShell() {
     whatIfService,
     setFailureCount,
   } = useSimulationUi();
+  const scenarioContent = useMemo(
+    () => getScenarioLearningContent(scenarioId),
+    [scenarioId],
+  );
   const { events, bufferedCount, connectionState, clearEvents, jumpToPhase } =
     useSimulation({
       paused,
       playbackRate,
       stepCounter,
+      scenarioId,
     });
   const { nodes, edges, metrics } = useFlowState(events);
   const [activeConcept, setActiveConcept] = useState<ConceptDefinition | null>(
     null,
   );
   const [shownConceptIds, setShownConceptIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCurrentPhase(1);
+    setShownConceptIds([]);
+    setActiveConcept(null);
+  }, [scenarioId, setCurrentPhase]);
 
   useEffect(() => {
     if (phaseJumpRequest === null) {
@@ -68,9 +260,10 @@ export function MainCanvasShell() {
       return;
     }
 
-    const phase = Math.min(4, Math.max(1, Math.trunc(phaseValue)));
+    const phaseMax = scenarioContent.phases.length;
+    const phase = Math.min(phaseMax, Math.max(1, Math.trunc(phaseValue)));
     setCurrentPhase(phase);
-  }, [events, setCurrentPhase]);
+  }, [events, scenarioContent.phases.length, setCurrentPhase]);
 
   useEffect(() => {
     if (!whatIfEnabled) {
@@ -99,7 +292,7 @@ export function MainCanvasShell() {
       return;
     }
 
-    const concept = conceptDefinitions.find((entry) => {
+    const concept = scenarioContent.conceptDefinitions.find((entry) => {
       if (!entry.triggerKinds.includes(latestEvent.kind)) {
         return false;
       }
@@ -113,7 +306,7 @@ export function MainCanvasShell() {
 
     setShownConceptIds((previous) => [...previous, concept.id]);
     setActiveConcept(concept);
-  }, [events, shownConceptIds]);
+  }, [events, scenarioContent.conceptDefinitions, shownConceptIds]);
 
   return (
     <section className="neo-panel grid min-h-[60dvh] grid-rows-[1fr,auto,auto] gap-3 bg-[var(--background)] p-3">
@@ -139,6 +332,10 @@ export function MainCanvasShell() {
             </Button>
           </div>
         </div>
+
+        {scenarioId === "ride-sharing" ? (
+          <RideSharingOverlay events={events} />
+        ) : null}
 
         <div
           className={`relative z-10 mt-4 ${whatIfEnabled ? "what-if-failure" : ""}`}

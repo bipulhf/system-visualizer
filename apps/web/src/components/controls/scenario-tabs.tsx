@@ -3,7 +3,7 @@ import { Button } from "~/components/ui/button";
 
 const scenarioTabs = [
   { label: "Flash Sale", to: "/scenarios/flash-sale", enabled: true },
-  { label: "Ride Sharing", to: "/", enabled: false },
+  { label: "Ride Sharing", to: "/scenarios/ride-sharing", enabled: true },
   { label: "Video Pipeline", to: "/", enabled: false },
   { label: "Banking", to: "/", enabled: false },
 ] as const;

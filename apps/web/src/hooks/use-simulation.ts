@@ -4,6 +4,7 @@ import type { SimulationEvent } from "~/lib/event-types";
 import {
   createSimulationWebSocket,
   type SimulationConnectionState,
+  type SimulationScenario,
 } from "~/lib/ws-client";
 
 const maxRetainedEvents = 300;
@@ -12,12 +13,14 @@ type UseSimulationOptions = {
   paused: boolean;
   playbackRate: PlaybackRate;
   stepCounter: number;
+  scenarioId: SimulationScenario;
 };
 
 export function useSimulation({
   paused,
   playbackRate,
   stepCounter,
+  scenarioId,
 }: UseSimulationOptions): {
   events: SimulationEvent[];
   bufferedCount: number;
@@ -31,6 +34,7 @@ export function useSimulation({
     useState<SimulationConnectionState>("connecting");
   const pausedRef = useRef<boolean>(paused);
   const playbackRateRef = useRef<PlaybackRate>(playbackRate);
+  const scenarioRef = useRef<SimulationScenario>(scenarioId);
   const bufferedEventsRef = useRef<SimulationEvent[]>([]);
   const timeoutIdsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const previousStepRef = useRef<number>(stepCounter);
@@ -68,6 +72,10 @@ export function useSimulation({
         setConnectionState(state);
       },
       onEvent: (event) => {
+        if (event.scenario !== scenarioRef.current) {
+          return;
+        }
+
         if (pausedRef.current) {
           bufferedEventsRef.current.push(event);
           setBufferedCount(bufferedEventsRef.current.length);
@@ -96,6 +104,10 @@ export function useSimulation({
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  useEffect(() => {
+    scenarioRef.current = scenarioId;
+  }, [scenarioId]);
 
   useEffect(() => {
     playbackRateRef.current = playbackRate;
@@ -143,6 +155,20 @@ export function useSimulation({
       socketClient.disconnect();
     };
   }, [socketClient]);
+
+  useEffect(() => {
+    if (connectionState !== "open") {
+      return;
+    }
+
+    socketClient.setScenario(scenarioId);
+  }, [connectionState, scenarioId, socketClient]);
+
+  useEffect(() => {
+    setEvents([]);
+    bufferedEventsRef.current = [];
+    setBufferedCount(0);
+  }, [scenarioId]);
 
   const clearEvents = useCallback(() => {
     setEvents([]);

@@ -536,37 +536,39 @@ interface SimulationEvent {
 
 ### Phase 4: Scenario 2 — Ride-Sharing Live Dispatch (Days 16-19)
 
+**Status:** Completed
+
 #### Backend Simulation (`scenarios/ride-sharing.ts`)
 
-- [ ] Phase 1 — Driver Heartbeat:
+- [x] Phase 1 — Driver Heartbeat:
   - Simulate N drivers sending GPS coords every 2s
   - Redis `GEOADD` + 30s TTL per driver
   - Redis Pub/Sub broadcasts location updates
   - Emit events for each heartbeat + geo update
 
-- [ ] Phase 2 — Ride Request:
+- [x] Phase 2 — Ride Request:
   - Passenger request → Redis `GEORADIUS` for nearest 5 drivers
   - BullMQ job with 30s timeout (delayed retry with wider radius)
   - Emit events for geo query + job creation
 
-- [ ] Phase 3 — Driver Acceptance:
+- [x] Phase 3 — Driver Acceptance:
   - RabbitMQ direct exchange → competing consumers pattern
   - Only ONE consumer processes (show others idle)
   - Emit events showing single-consumer selection
 
-- [ ] Phase 4 — Trip Lifecycle:
+- [x] Phase 4 — Trip Lifecycle:
   - Kafka topic `trip-events` with state transitions
   - Multiple consumer groups at different speeds
   - PostgreSQL write only at trip completion
 
 #### Frontend Integration
 
-- [ ] @xyflow layout for ride-sharing architecture
-- [ ] Animated driver dots on a mini-map overlay (or abstract representation)
-- [ ] BullMQ timeout countdown visualization
-- [ ] RabbitMQ competing consumers — visual showing only 1 worker activates
-- [ ] Learning content: Redis Geo, delayed jobs, competing vs fan-out, event state machine
-- [ ] Concept cards: "Competing Consumers", "Geo Hashing", "TTL Auto-Expiry", "State Machine"
+- [x] @xyflow layout for ride-sharing architecture
+- [x] Animated driver dots on a mini-map overlay (or abstract representation)
+- [x] BullMQ timeout countdown visualization
+- [x] RabbitMQ competing consumers — visual showing only 1 worker activates
+- [x] Learning content: Redis Geo, delayed jobs, competing vs fan-out, event state machine
+- [x] Concept cards: "Competing Consumers", "Geo Hashing", "TTL Auto-Expiry", "State Machine"
 
 **Deliverable:** Complete Scenario 2 with all learning features.
 
