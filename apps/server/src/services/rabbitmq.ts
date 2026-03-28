@@ -386,8 +386,9 @@ export async function publishVideoPipelineMessage(
 
   const latencyMs = Math.round(performance.now() - startedAt);
   const queueName =
-    videoRoutingBindings.find((binding) => binding.routingKey === options.routingKey)
-      ?.queueName ?? "video-pipeline.unmatched";
+    videoRoutingBindings.find(
+      (binding) => binding.routingKey === options.routingKey,
+    )?.queueName ?? "video-pipeline.unmatched";
 
   emitSimulationEvent({
     scenario: context.scenario,

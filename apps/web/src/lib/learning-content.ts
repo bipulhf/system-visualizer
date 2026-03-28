@@ -477,7 +477,8 @@ export const scenarioLearningContent: Record<
           "A durable event stream captures publish lifecycle and supports independent replay by multiple teams.",
         comparison:
           "Single destination notifications cannot be replayed reliably for new consumers.",
-        keyMetric: "Immutable publish event log across multiple consumer groups",
+        keyMetric:
+          "Immutable publish event log across multiple consumer groups",
       },
       postgres: {
         service: "postgres",

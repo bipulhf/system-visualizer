@@ -185,7 +185,9 @@ function isVideoRendition(value: string): value is VideoRendition {
   return videoRenditions.includes(value as VideoRendition);
 }
 
-function createVideoGraphSnapshot(events: SimulationEvent[]): VideoGraphSnapshot {
+function createVideoGraphSnapshot(
+  events: SimulationEvent[],
+): VideoGraphSnapshot {
   const childCreatedByRendition: Record<VideoRendition, number> = {
     "240p": 0,
     "360p": 0,

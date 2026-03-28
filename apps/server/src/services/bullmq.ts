@@ -101,8 +101,7 @@ let rideDispatchWorker: Worker<RideDispatchJobData, RideDispatchResult> | null =
   null;
 let videoParentWorker: Worker<VideoParentJobData, VideoParentResult> | null =
   null;
-let videoChildWorker: Worker<VideoChildJobData, VideoChildResult> | null =
-  null;
+let videoChildWorker: Worker<VideoChildJobData, VideoChildResult> | null = null;
 
 function emitBullMqEvent(
   job:

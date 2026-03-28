@@ -333,7 +333,10 @@ function buildVideoPipelineOverlaySnapshot(
 }
 
 function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
-  const snapshot = useMemo(() => buildVideoPipelineOverlaySnapshot(events), [events]);
+  const snapshot = useMemo(
+    () => buildVideoPipelineOverlaySnapshot(events),
+    [events],
+  );
 
   return (
     <section className="neo-panel mt-3 grid gap-2 bg-[var(--surface)] p-2 lg:grid-cols-[1.4fr,1fr]">
@@ -363,7 +366,10 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
           })}
         </div>
         <p className="mt-2 text-xs font-black uppercase tracking-wide">
-          DLQ Graveyard: {snapshot.dlqRenditions.length > 0 ? snapshot.dlqRenditions.join(", ") : "none"}
+          DLQ Graveyard:{" "}
+          {snapshot.dlqRenditions.length > 0
+            ? snapshot.dlqRenditions.join(", ")
+            : "none"}
         </p>
       </article>
 
@@ -395,7 +401,8 @@ function VideoPipelineOverlay({ events }: { events: SimulationEvent[] }) {
             ) : (
               snapshot.consumerStats.map((entry) => (
                 <p key={entry.consumerGroup} className="font-semibold">
-                  {entry.consumerGroup}: {entry.consumedCount} events, {entry.averageLatencyMs}ms avg
+                  {entry.consumerGroup}: {entry.consumedCount} events,{" "}
+                  {entry.averageLatencyMs}ms avg
                 </p>
               ))
             )}

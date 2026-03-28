@@ -141,7 +141,13 @@ function buildProgressKey(uploadId: string, rendition: RenditionName): string {
 function resolvePreferredRendition(
   completedRenditions: Set<RenditionName>,
 ): RenditionName {
-  const priorityOrder: RenditionName[] = ["4k", "1080p", "720p", "360p", "240p"];
+  const priorityOrder: RenditionName[] = [
+    "4k",
+    "1080p",
+    "720p",
+    "360p",
+    "240p",
+  ];
 
   for (const rendition of priorityOrder) {
     if (completedRenditions.has(rendition)) {
@@ -208,7 +214,10 @@ async function finalizeUpload(
   uploadState.finalizeInFlight = true;
 
   try {
-    emitPhaseChange(5, "Phase 5 activated: finalize database state and cleanup");
+    emitPhaseChange(
+      5,
+      "Phase 5 activated: finalize database state and cleanup",
+    );
 
     await runVideoPipelineFinalize(buildContext(requestId, 5), {
       uploadId: uploadState.uploadId,
@@ -335,7 +344,9 @@ async function handleVideoChildProgress(event: SimulationEvent): Promise<void> {
   );
 }
 
-async function handleVideoChildCompleted(event: SimulationEvent): Promise<void> {
+async function handleVideoChildCompleted(
+  event: SimulationEvent,
+): Promise<void> {
   if (parseStringData(event, "workflow") !== "video-child") {
     return;
   }
@@ -344,7 +355,12 @@ async function handleVideoChildCompleted(event: SimulationEvent): Promise<void> 
   const uploadId = parseStringData(event, "uploadId");
   const renditionRaw = parseStringData(event, "rendition");
 
-  if (!requestId || !uploadId || !renditionRaw || !isRenditionName(renditionRaw)) {
+  if (
+    !requestId ||
+    !uploadId ||
+    !renditionRaw ||
+    !isRenditionName(renditionRaw)
+  ) {
     return;
   }
 
@@ -392,7 +408,10 @@ async function handleVideoChildFailed(event: SimulationEvent): Promise<void> {
     return;
   }
 
-  emitPhaseChange(3, "Phase 3 activated: failed child to DLQ while others continue");
+  emitPhaseChange(
+    3,
+    "Phase 3 activated: failed child to DLQ while others continue",
+  );
 
   uploadState.failedRenditions.add(renditionRaw);
   childJobsFailed += 1;
@@ -415,7 +434,12 @@ async function handleVideoChildDlq(event: SimulationEvent): Promise<void> {
   const uploadId = parseStringData(event, "uploadId");
   const renditionRaw = parseStringData(event, "rendition");
 
-  if (!requestId || !uploadId || !renditionRaw || !isRenditionName(renditionRaw)) {
+  if (
+    !requestId ||
+    !uploadId ||
+    !renditionRaw ||
+    !isRenditionName(renditionRaw)
+  ) {
     return;
   }
 
@@ -477,7 +501,10 @@ async function processUpload(uploadIndex: number): Promise<void> {
     description: `Video upload received ${uploadId}`,
   });
 
-  await runVideoPipelineUploadIntake(buildContext(intakeRequestId, 1), uploadId);
+  await runVideoPipelineUploadIntake(
+    buildContext(intakeRequestId, 1),
+    uploadId,
+  );
 
   const parentJobId = await enqueueVideoPipelineParentJob(
     buildContext(parentRequestId, 1),
@@ -546,7 +573,10 @@ async function runIngestionTick(): Promise<void> {
 
   try {
     if (forcedPhase !== null) {
-      emitPhaseChange(forcedPhase, `Phase ${forcedPhase} activated by user jump`);
+      emitPhaseChange(
+        forcedPhase,
+        `Phase ${forcedPhase} activated by user jump`,
+      );
       forcedPhase = null;
     }
 
