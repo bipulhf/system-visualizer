@@ -803,6 +803,22 @@ export async function runBankingAuditRead(
   };
 }
 
+type PostgresResourceStats = {
+  dbSizeMb: number;
+  activeConnections: number;
+};
+
+export async function getPostgresResourceStats(): Promise<PostgresResourceStats> {
+  const [sizeResult, connResult] = await Promise.all([
+    sql<[{ db_size: string }]>`SELECT pg_database_size(current_database())::text AS db_size`,
+    sql<[{ active: string }]>`SELECT count(*)::text AS active FROM pg_stat_activity WHERE state = 'active'`,
+  ]);
+  return {
+    dbSizeMb: Math.round(Number(sizeResult[0]?.db_size ?? 0) / 1024 / 1024),
+    activeConnections: Number(connResult[0]?.active ?? 0),
+  };
+}
+
 export async function closePostgresConnection(): Promise<void> {
   await sql.end({ timeout: 2 });
 }

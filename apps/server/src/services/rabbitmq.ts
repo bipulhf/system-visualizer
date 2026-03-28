@@ -716,6 +716,40 @@ export async function requestBankingFraudDecision(
   return decision;
 }
 
+type RabbitMqManagementNode = {
+  mem_used?: number;
+  fd_used?: number;
+  proc_used?: number;
+};
+
+export async function getRabbitMqManagementStats(): Promise<{ memUsedMb: number } | null> {
+  try {
+    const normalized = env.rabbitMqUrl.replace(/^amqps?/, "http");
+    const parsed = new URL(normalized);
+    const credentials = Buffer.from(`${parsed.username}:${parsed.password}`).toString("base64");
+    const managementUrl = `http://${parsed.hostname}:15672/api/nodes`;
+
+    const response = await fetch(managementUrl, {
+      headers: { Authorization: `Basic ${credentials}` },
+      signal: AbortSignal.timeout(2000),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const nodes = (await response.json()) as RabbitMqManagementNode[];
+    const firstNode = nodes[0];
+    if (!firstNode?.mem_used) {
+      return null;
+    }
+
+    return { memUsedMb: Math.round(firstNode.mem_used / 1024 / 1024) };
+  } catch {
+    return null;
+  }
+}
+
 export async function closeRabbitMqConnection(): Promise<void> {
   pendingBankingReplies.clear();
 

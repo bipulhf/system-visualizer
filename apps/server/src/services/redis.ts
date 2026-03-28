@@ -376,6 +376,11 @@ export async function deleteRedisKey(
   return deletedCount;
 }
 
+export async function getRedisInfoSection(section: string): Promise<string> {
+  await ensureRedisConnection();
+  return redis.info(section);
+}
+
 export async function closeRedisConnection(): Promise<void> {
   if (redis.status === "end") {
     return;

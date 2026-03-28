@@ -6,6 +6,8 @@ import { FlowCanvas } from "~/components/flow/flow-canvas";
 import { ConceptCard } from "~/components/learning/concept-card";
 import { SummaryCard } from "~/components/learning/summary-card";
 import { ActivityBar } from "~/components/monitor/activity-bar";
+import { ResourceBar } from "~/components/monitor/resource-bar";
+import { useServiceMetrics } from "~/hooks/use-service-metrics";
 import { Button } from "~/components/ui/button";
 import { useFlowState } from "~/hooks/use-flow-state";
 import { useSimulation } from "~/hooks/use-simulation";
@@ -742,6 +744,7 @@ export function MainCanvasShell({
     throttledFlowEvents,
     scenarioId,
   );
+  const metricsSnapshot = useServiceMetrics();
   const [activeConcept, setActiveConcept] = useState<ConceptDefinition | null>(
     null,
   );
@@ -1203,7 +1206,10 @@ export function MainCanvasShell({
           {showLoadingState ? (
             <section className="skeleton-wave h-28 rounded-xl bg-[var(--surface-2)]" />
           ) : (
-            <ActivityBar metrics={metrics} events={throttledFlowEvents} />
+            <>
+              <ActivityBar metrics={metrics} events={throttledFlowEvents} />
+              <ResourceBar snapshot={metricsSnapshot} />
+            </>
           )}
         </section>
       ) : null}

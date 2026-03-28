@@ -47,6 +47,7 @@ import {
   closeRabbitMqConnection,
 } from "./services/rabbitmq";
 import { checkRedisConnection, closeRedisConnection } from "./services/redis";
+import { collectMetricsSnapshot } from "./services/metrics";
 import { log } from "./utils/logger";
 
 type ServiceHealth = {
@@ -284,6 +285,10 @@ const app = new Elysia()
   .get("/health", async () => {
     const result = await getServiceHealth();
     return result;
+  })
+  .get("/metrics", async () => {
+    const snapshot = await collectMetricsSnapshot();
+    return snapshot;
   })
   .get("/simulation/harness", () => {
     const status = getScenarioStatus(activeScenario);
