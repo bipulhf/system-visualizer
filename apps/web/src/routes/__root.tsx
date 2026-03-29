@@ -42,7 +42,7 @@ function RootDocument({ children }: { children: ReactNode }) {
             <TopNav />
             <main className="grid gap-4 p-4 md:gap-6 md:p-6 md:grid-cols-[280px,1fr]">
               <Sidebar />
-              <section>{children}</section>
+              <section className="min-w-0 overflow-x-hidden">{children}</section>
             </main>
           </div>
         </SimulationUiProvider>

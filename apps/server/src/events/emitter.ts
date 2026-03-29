@@ -17,6 +17,37 @@ export function emitSimulationEvent(
   return event;
 }
 
+export async function captureTraceEvents(
+  requestId: string,
+  runner: () => Promise<void>,
+  asyncSettleMs = 2500,
+): Promise<SimulationEvent[]> {
+  const events: SimulationEvent[] = [];
+
+  const prefix = requestId + ":";
+  const unsub = onSimulationEvent((event) => {
+    const evtRequestId = event.data["requestId"];
+    if (
+      typeof evtRequestId === "string" &&
+      (evtRequestId === requestId || evtRequestId.startsWith(prefix))
+    ) {
+      events.push(event);
+    }
+  });
+
+  try {
+    await runner();
+  } catch {
+    // still return partial events
+  }
+
+  // Wait for async downstream events (BullMQ worker, RabbitMQ consumer)
+  await new Promise<void>((resolve) => setTimeout(resolve, asyncSettleMs));
+
+  unsub();
+  return events;
+}
+
 export function onSimulationEvent(
   listener: (event: SimulationEvent) => void,
 ): () => void {

@@ -37,6 +37,12 @@ export function TopNav() {
         >
           Learn
         </Link>
+        <Link
+          to="/trace"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+        >
+          Trace
+        </Link>
       </nav>
 
       <SpeedSlider />

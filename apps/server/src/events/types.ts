@@ -51,3 +51,17 @@ export interface SimulationContext {
   phase: number;
   requestId: string;
 }
+
+export type TraceStep = SimulationEvent & {
+  stepIndex: number;
+  cumulativeLatencyMs: number;
+};
+
+export interface TraceResult {
+  requestId: string;
+  steps: TraceStep[];
+  totalLatencyMs: number;
+  startedAt: number;
+  scenarioId: string;
+  scenarioLabel: string;
+}

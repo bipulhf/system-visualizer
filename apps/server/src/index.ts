@@ -47,6 +47,7 @@ import {
   closeRabbitMqConnection,
 } from "./services/rabbitmq";
 import { checkRedisConnection, closeRedisConnection } from "./services/redis";
+import { runTrace, type TraceScenarioId } from "./scenarios/trace-runner";
 import { collectMetricsSnapshot } from "./services/metrics";
 import { log } from "./utils/logger";
 
@@ -282,6 +283,17 @@ function parseSimulationCommand(
 }
 
 const app = new Elysia()
+  .onRequest(({ set }) => {
+    set.headers["Access-Control-Allow-Origin"] = "*";
+    set.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+    set.headers["Access-Control-Allow-Headers"] = "Content-Type";
+  })
+  .options("/*", ({ set }) => {
+    set.headers["Access-Control-Allow-Origin"] = "*";
+    set.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+    set.headers["Access-Control-Allow-Headers"] = "Content-Type";
+    return new Response(null, { status: 204 });
+  })
   .get("/health", async () => {
     const result = await getServiceHealth();
     return result;
@@ -289,6 +301,21 @@ const app = new Elysia()
   .get("/metrics", async () => {
     const snapshot = await collectMetricsSnapshot();
     return snapshot;
+  })
+  .post("/simulation/trace", async ({ query }) => {
+    const validScenarios: TraceScenarioId[] = [
+      "flash-sale",
+      "ride-sharing",
+      "video-pipeline",
+      "banking",
+    ];
+    const scenarioParam = query["scenario"];
+    const scenarioId: TraceScenarioId =
+      validScenarios.includes(scenarioParam as TraceScenarioId)
+        ? (scenarioParam as TraceScenarioId)
+        : "flash-sale";
+    const result = await runTrace(scenarioId);
+    return result;
   })
   .get("/simulation/harness", () => {
     const status = getScenarioStatus(activeScenario);

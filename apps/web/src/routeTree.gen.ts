@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TraceIndexRouteImport } from './routes/trace/index'
 import { Route as LearnIndexRouteImport } from './routes/learn/index'
 import { Route as ScenariosVideoPipelineRouteImport } from './routes/scenarios/video-pipeline'
 import { Route as ScenariosRideSharingRouteImport } from './routes/scenarios/ride-sharing'
@@ -20,6 +21,11 @@ import { Route as LearnConceptRouteImport } from './routes/learn/$concept'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TraceIndexRoute = TraceIndexRouteImport.update({
+  id: '/trace/',
+  path: '/trace/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LearnIndexRoute = LearnIndexRouteImport.update({
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
   '/learn/': typeof LearnIndexRoute
+  '/trace/': typeof TraceIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
   '/learn': typeof LearnIndexRoute
+  '/trace': typeof TraceIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/scenarios/ride-sharing': typeof ScenariosRideSharingRoute
   '/scenarios/video-pipeline': typeof ScenariosVideoPipelineRoute
   '/learn/': typeof LearnIndexRoute
+  '/trace/': typeof TraceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
     | '/learn/'
+    | '/trace/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
     | '/learn'
+    | '/trace'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/scenarios/ride-sharing'
     | '/scenarios/video-pipeline'
     | '/learn/'
+    | '/trace/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   ScenariosRideSharingRoute: typeof ScenariosRideSharingRoute
   ScenariosVideoPipelineRoute: typeof ScenariosVideoPipelineRoute
   LearnIndexRoute: typeof LearnIndexRoute
+  TraceIndexRoute: typeof TraceIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trace/': {
+      id: '/trace/'
+      path: '/trace'
+      fullPath: '/trace/'
+      preLoaderRoute: typeof TraceIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/learn/': {
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScenariosRideSharingRoute: ScenariosRideSharingRoute,
   ScenariosVideoPipelineRoute: ScenariosVideoPipelineRoute,
   LearnIndexRoute: LearnIndexRoute,
+  TraceIndexRoute: TraceIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
