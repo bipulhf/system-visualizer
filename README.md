@@ -1,5 +1,9 @@
 # System Visualizer
 
+<p align="left">
+  <img src="apps/web/public/sv_logo.png" alt="System Visualizer logo" width="96" />
+</p>
+
 Interactive distributed-systems learning platform with real infrastructure in the loop. The app visualizes live flows across Redis, BullMQ, RabbitMQ, Kafka, and PostgreSQL while scenarios run through an Elysia backend and stream events over WebSocket.
 
 ## What You Get

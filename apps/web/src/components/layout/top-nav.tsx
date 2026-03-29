@@ -9,9 +9,13 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 shadow-xs md:px-6">
       <Link to="/" className="flex shrink-0 items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--main)] text-xs font-bold text-white">
-          SV
-        </span>
+        <img
+          src="/sv_logo.png"
+          alt="System Visualizer logo"
+          className="h-7 w-7 rounded-lg object-cover"
+          width={28}
+          height={28}
+        />
         <span className="hidden text-sm font-semibold md:block">
           System Visualizer
         </span>

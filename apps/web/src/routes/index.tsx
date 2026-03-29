@@ -37,8 +37,10 @@ const difficultyColorClass: Record<
   "Beginner" | "Intermediate" | "Advanced",
   string
 > = {
-  Beginner: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
-  Intermediate: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+  Beginner:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+  Intermediate:
+    "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
   Advanced: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
 };
 
@@ -78,7 +80,7 @@ const technologyHighlights = [
 function HomePage() {
   return (
     <div className="space-y-6 py-2">
-      <div className="card overflow-hidden rounded-2xl p-6 md:p-8">
+      <div className="card relative overflow-hidden rounded-2xl p-6 md:p-8">
         <div className="absolute -left-16 top-6 h-44 w-44 rounded-full bg-[var(--main)]/20 blur-3xl" />
         <div className="absolute -right-10 bottom-0 h-52 w-52 rounded-full bg-[var(--kafka)]/15 blur-3xl" />
 
